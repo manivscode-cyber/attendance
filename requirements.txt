@@ -8,3 +8,11 @@ SQLAlchemy==2.0.34
 # Optional (for face recognition):
 # face-recognition==1.3.0
 # dlib==19.24.0
+Flask
+gunicorn
+flask_sqlalchemy
+werkzeug
+pytz
+opencv-python
+face-recognition
+numpy
