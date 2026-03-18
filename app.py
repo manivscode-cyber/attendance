@@ -6,10 +6,14 @@
 import os
 import json
 from datetime import datetime, date
+import pytz
+
+IST = pytz.timezone('Asia/Kolkata')
 from functools import wraps
 from flask import Flask, render_template, request, jsonify, session, redirect, url_for, flash, Blueprint
 from werkzeug.security import generate_password_hash, check_password_hash
 from flask_sqlalchemy import SQLAlchemy
+
 
 app = Flask(__name__, template_folder='templates', static_folder='static')
 app.config.from_object('config')
@@ -23,12 +27,12 @@ class Employee(db.Model):
     id = db.Column(db.Integer, primary_key=True)
     emp_id = db.Column(db.String(50), unique=True, nullable=False)
     name = db.Column(db.String(100), nullable=False)
-    email = db.Column(db.String(100), nullable=False)
+    email = db.Column(db.String(100))
     department = db.Column(db.String(100))
     password_hash = db.Column(db.String(255), nullable=False)
     is_admin = db.Column(db.Boolean, default=False)
     face_encoding = db.Column(db.LargeBinary)  # Pickled numpy array for face encoding
-    created_at = db.Column(db.DateTime, default=datetime.utcnow)
+    created_at = db.Column(db.DateTime, default=lambda: datetime.now(IST))
 
 class Attendance(db.Model):
     id = db.Column(db.Integer, primary_key=True)
@@ -125,25 +129,64 @@ def calculate_total_hours(check_in_str, check_out_str):
     except:
         return 0.0
 
-def verify_face_recognition(face_image_data):
-    """
-    Verify face recognition from image data
-    This is a placeholder - integrate with actual face recognition library
-    In production, use: face_recognition, deepface, or mediapipe
+
+def get_face_encoding_from_base64(image_data):
+    """Convert Base64 image data into a face encoding (numpy array).
+
+    Returns:
+        numpy.ndarray or None
     """
     try:
-        # For now, return True (mock verification)
-        # In production, implement actual face recognition:
-        # import face_recognition
-        # import numpy as np
-        # face_encodings = face_recognition.face_encodings(image)
-        # known_face_encoding = face_recognition.face_encodings(known_image)[0]
-        # results = face_recognition.compare_faces([known_face_encoding], face_encodings[0])
+        import base64
+        import cv2
+        import numpy as np
+        import face_recognition
+    except ImportError:
+        return None
+
+    if not image_data:
+        return None
+
+    try:
+        if ',' in image_data:
+            _, encoded = image_data.split(',', 1)
+        else:
+            encoded = image_data
+
+        img_bytes = base64.b64decode(encoded)
+        np_arr = np.frombuffer(img_bytes, np.uint8)
+        img = cv2.imdecode(np_arr, cv2.IMREAD_COLOR)
+        if img is None:
+            print("DEBUG: Failed to decode image")
+            return None
+
+        rgb_img = cv2.cvtColor(img, cv2.COLOR_BGR2RGB)
+
+        # Detect faces in the image
+        face_locations = face_recognition.face_locations(rgb_img, model='hog')
+        if not face_locations:
+            print("DEBUG: No faces detected by HOG model")
+            return None
+
+        print(f"DEBUG: Found {len(face_locations)} face(s)")
+
+        # Extract face encoding from the first detected face
+        encodings = face_recognition.face_encodings(rgb_img, face_locations)
+        if not encodings or len(encodings) == 0:
+            print("DEBUG: Could not extract face encoding")
+            return None
+
+        print(f"DEBUG: Successfully extracted face encoding")
+        return encodings[0]
         
-        return face_image_data is not None  # Mock verification
     except Exception as e:
-        print(f"Face recognition error: {e}")
-        return False
+        print(f"Face extraction error: {e}")
+        return None
+
+
+def verify_face_recognition(face_image_data):
+    """DEPRECATED placeholder - use get_face_encoding_from_base64() instead."""
+    return bool(face_image_data)
 
 # ────────────────────────────────────────────────
 #   DECORATORS
@@ -329,7 +372,7 @@ def checkout(emp_id):
     ).first()
 
     if today_attendance and today_attendance.check_in and not today_attendance.check_out:
-        now = datetime.now()
+        now = datetime.now(IST)
         current_time_str = now.strftime('%H:%M')
         check_in_time = datetime.strptime(today_attendance.check_in, '%H:%M')
         check_out_time = datetime.strptime(current_time_str, '%H:%M')
@@ -509,54 +552,85 @@ def verify_face():
     try:
         data = request.get_json()
         if not data or 'image_data' not in data:
-            return jsonify({'success': False, 'message': 'No face image data provided'}), 400
+            return jsonify({'success': False, 'message': 'No face image data provided', 'detected': False}), 400
 
         image_data = data['image_data']
 
-        # Mock face recognition - prioritize the logged-in employee for testing
-        session_emp_id = session.get('emp_id')
-        if session_emp_id:
-            recognized_employee = Employee.query.filter_by(emp_id=session_emp_id).first()
-            if recognized_employee:
-                return jsonify({
-                    'success': True,
-                    'message': 'Face recognized successfully!',
-                    'employee': {
-                        'emp_id': recognized_employee.emp_id,
-                        'name': recognized_employee.name,
-                        'department': recognized_employee.department or 'General'
-                    }
-                })
-
-        # Fallback to mock recognition
-        employees = Employee.query.order_by(Employee.id).all()
-        if not employees:
+        # Get a reliable face encoding from the image (returns None when no valid face is found)
+        unknown_encoding = get_face_encoding_from_base64(image_data)
+        if unknown_encoding is None:
             return jsonify({
                 'success': False,
-                'message': 'No employees found. Please enroll first.',
+                'message': 'No face detected in image',
+                'detected': False,
                 'recognized': False
             })
 
-        # Pick pseudo-random employee based on image data
-        import hashlib
-        key = hashlib.md5(image_data.encode('utf-8')).hexdigest()
-        index = int(key, 16) % len(employees)
-        recognized_employee = employees[index]
+        # Compare against all enrolled employees
+        try:
+            import face_recognition
+            import pickle
+        except ImportError:
+            return jsonify({
+                'success': False,
+                'message': 'Face recognition library not available',
+                'detected': True,
+                'recognized': False
+            }), 503
+
+        employees = Employee.query.filter(Employee.face_encoding.isnot(None)).all()
+        if not employees:
+            return jsonify({
+                'success': False,
+                'message': 'No enrolled employees found',
+                'detected': True,
+                'recognized': False
+            })
+
+        best_match = None
+        best_distance = 1.0
+        TOLERANCE = 0.6
+
+        for emp in employees:
+            if not emp.face_encoding:
+                continue
+            try:
+                known_encoding = pickle.loads(emp.face_encoding)
+                distances = face_recognition.face_distance([known_encoding], unknown_encoding)
+                if len(distances) and distances[0] < best_distance:
+                    best_distance = distances[0]
+                    if distances[0] < TOLERANCE:
+                        best_match = emp
+            except Exception as compare_error:
+                print(f"Error comparing face with {emp.emp_id}: {compare_error}")
+                continue
+
+        if best_match:
+            return jsonify({
+                'success': True,
+                'message': 'Face recognized successfully!',
+                'detected': True,
+                'recognized': True,
+                'employee': {
+                    'emp_id': best_match.emp_id,
+                    'name': best_match.name,
+                    'department': best_match.department or 'General'
+                }
+            })
 
         return jsonify({
-            'success': True,
-            'message': 'Face recognized successfully!',
-            'employee': {
-                'emp_id': recognized_employee.emp_id,
-                'name': recognized_employee.name,
-                'department': recognized_employee.department or 'General'
-            }
+            'success': False,
+            'message': 'Face detected but not recognized. Please enroll.',
+            'detected': True,
+            'recognized': False
         })
+
     except Exception as e:
+        print(f"Face verification error: {str(e)}")
         return jsonify({
             'success': False,
             'message': f'Error: {str(e)}',
-            'recognized': False
+            'detected': False
         }), 500
 
 @attendance_bp.route('/api/enroll-face', methods=['POST'])
@@ -564,6 +638,17 @@ def verify_face():
 def enroll_face():
     """Enroll new employee with face recognition"""
     try:
+        # Import necessary libraries
+        try:
+            import face_recognition
+            import cv2
+            import numpy as np
+            import pickle
+            import base64
+            FACE_AVAILABLE = True
+        except ImportError:
+            FACE_AVAILABLE = False
+
         emp_id = request.form.get('emp_id', '').upper().strip()
         name = request.form.get('name', '').strip()
         department = request.form.get('department', 'General')
@@ -572,37 +657,57 @@ def enroll_face():
         if not emp_id or not name:
             return jsonify({'success': False, 'message': 'Employee ID and name are required'}), 400
 
+        if not image_data:
+            return jsonify({'success': False, 'message': 'No face image provided'}), 400
+
         # Check if employee ID already exists
         existing_employee = Employee.query.filter_by(emp_id=emp_id).first()
         if existing_employee:
             return jsonify({'success': False, 'message': 'Employee ID already exists'}), 400
 
-        # Create new employee
+        # Extract and process face encoding
+        face_encoding_data = None
+        if FACE_AVAILABLE:
+            face_encoding = get_face_encoding_from_base64(image_data)
+            if face_encoding is None:
+                return jsonify({'success': False, 'message': 'No face detected in image'}), 400
+            try:
+                import pickle
+                face_encoding_data = pickle.dumps(face_encoding)
+            except Exception as pickle_error:
+                print(f"Face encoding serialization error: {pickle_error}")
+                return jsonify({'success': False, 'message': 'Failed to store face encoding'}), 500
+        else:
+            # If face recognition isn't installed, prevent enrollment to avoid false enrollments
+            return jsonify({'success': False, 'message': 'Face recognition library not available'}), 503
+
+        # Create new employee with face encoding
         new_employee = Employee(
             emp_id=emp_id,
             name=name,
             email='',  # Can be updated later
             department=department,
             password_hash=generate_password_hash(name),  # Use name as default password
-            is_admin=False
+            is_admin=False,
+            face_encoding=face_encoding_data  # Store pickled face encoding
         )
 
-        # In production, save face encoding
-        # For now, just save the image data as a placeholder
+        # Also save face image for backup
         if image_data:
             os.makedirs('data/faces', exist_ok=True)
-            # Save base64 image data
-            import base64
-            image_data = image_data.replace('data:image/jpeg;base64,', '')
-            with open(f'data/faces/{emp_id}_face.jpg', 'wb') as f:
-                f.write(base64.b64decode(image_data))
+            try:
+                image_clean = image_data.replace('data:image/jpeg;base64,', '')
+                with open(f'data/faces/{emp_id}_face.jpg', 'wb') as f:
+                    f.write(base64.b64decode(image_clean))
+            except Exception as save_error:
+                print(f"Error saving face image: {str(save_error)}")
 
         db.session.add(new_employee)
         db.session.commit()
 
-        # Now mark their first attendance
+        # Mark their first attendance
         today = date.today()
-        now = datetime.now()
+        now = datetime.now(IST)
         current_time_str = now.strftime('%H:%M')
         status = get_attendance_status(current_time_str)
 
@@ -611,7 +716,7 @@ def enroll_face():
             date=today,
             check_in=current_time_str,
             status=status,
-            attendance_type='Onsite',  # Default for first check-in
+            attendance_type='Onsite',
             department=department or new_employee.department or 'General'
         )
         db.session.add(new_attendance)
@@ -628,6 +733,7 @@ def enroll_face():
         })
     except Exception as e:
         db.session.rollback()
+        print(f"Enrollment API error: {str(e)}")
         return jsonify({
             'success': False,
             'message': f'Enrollment failed: {str(e)}'
@@ -652,7 +758,7 @@ def face_attendance_api():
             return jsonify({'success': False, 'message': 'Employee not found'}), 404
 
         today = date.today()
-        now = datetime.now()
+        now = datetime.now(IST)
         current_time_str = now.strftime('%H:%M')
 
         # Check if already checked in today

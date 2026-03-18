@@ -24,12 +24,16 @@
                 <i class="fas fa-camera"></i> Capture Face
             </button>
 
-            <div id="faceStatus" style="color:#10b981; font-weight:600; font-size:1.1rem; display:none;">
+            <div id="faceStatus" style="color:#10b981; font-weight:600; font-size:1.1rem; display:none; margin-bottom:1rem;">
                 ✓ Face Captured Successfully
             </div>
 
+            <div id="faceNotDetected" style="color:#ef4444; font-weight:600; font-size:1.1rem; display:none; margin-bottom:1rem;">
+                ✗ Face Not Detected - Please Position Your Face Properly
+            </div>
+
             <div id="employeeInfo" style="display:none; margin-top:1rem; padding:1rem; background:rgba(16,185,129,0.1); border-radius:8px; border:1px solid rgba(16,185,129,0.3);">
-                <h4 style="color:#10b981; margin:0 0 0.5rem;">Employee Recognized</h4>
+                <h4 style="color:#10b981; margin:0 0 0.5rem;"><i class="fas fa-check-circle"></i> Employee Recognized</h4>
                 <p id="empDetails" style="margin:0; color:var(--text-primary);"></p>
             </div>
         </div>
@@ -219,16 +223,15 @@ function captureFace() {
     const canvas = document.createElement('canvas');
     const ctx = canvas.getContext('2d');
 
+    // Reset status indicators
+    document.getElementById('faceStatus').style.display = 'none';
+    document.getElementById('faceNotDetected').style.display = 'none';
+
     canvas.width = video.videoWidth;
     canvas.height = video.videoHeight;
     ctx.drawImage(video, 0, 0, canvas.width, canvas.height);
 
     capturedImageData = canvas.toDataURL('image/jpeg', 0.8);
-
-    const faceStatus = document.getElementById('faceStatus');
-    faceStatus.style.display = 'block';
-    faceStatus.style.color = '#10b981';
-    faceStatus.innerHTML = '✓ Face Captured Successfully';
 
     // Try to recognize the face
     recognizeFace(capturedImageData);
@@ -237,6 +240,13 @@ function captureFace() {
 // Recognize face via API
 async function recognizeFace(imageData) {
     try {
+        const faceStatus = document.getElementById('faceStatus');
+        const faceNotDetected = document.getElementById('faceNotDetected');
+        
+        // Hide both messages initially
+        faceStatus.style.display = 'none';
+        faceNotDetected.style.display = 'none';
+
         const response = await fetch('/api/verify-face', {
             method: 'POST',
             headers: {
@@ -249,16 +259,39 @@ async function recognizeFace(imageData) {
 
         const result = await response.json();
 
-        if (result.success && result.employee) {
-            // Employee recognized - show attendance form
+        // Check if face was detected
+        if (result.detected === false) {
+            // No face detected
+            faceNotDetected.style.display = 'block';
+            faceNotDetected.style.color = '#ef4444';
+            faceNotDetected.innerHTML = '✗ Face Not Detected - Please Position Your Face Properly';
+            showEnrollmentForm();
+            return;
+        }
+
+        if (result.success && result.employee && result.recognized === true) {
+            // Face detected AND recognized as registered employee
+            faceStatus.style.display = 'block';
+            faceStatus.style.color = '#10b981';
+            faceStatus.innerHTML = '✓ Face Captured Successfully';
             showEmployeeInfo(result.employee);
             showAttendanceForm(result.employee.emp_id);
+        } else if (result.detected === true && result.recognized === false) {
+            // Face detected but not registered - show enrollment form
+            faceNotDetected.style.display = 'block';
+            faceNotDetected.style.color = '#f59e0b';  // Amber color
+            faceNotDetected.innerHTML = '⚠ Face Detected - Please Enroll';
+            showEnrollmentForm();
         } else {
-            // Employee not recognized - show enrollment form
+            // Fallback handling
+            faceNotDetected.style.display = 'block';
+            faceNotDetected.innerHTML = result.message || '✗ Face Not Detected';
             showEnrollmentForm();
         }
     } catch (error) {
         console.error('Face recognition error:', error);
+        document.getElementById('faceNotDetected').style.display = 'block';
+        document.getElementById('faceNotDetected').innerHTML = '✗ Error Processing Face - Please Try Again';
         showEnrollmentForm();
     }
 }
@@ -276,6 +309,7 @@ function showEmployeeInfo(employee) {
     `;
 
     employeeInfo.style.display = 'block';
+    document.getElementById('faceNotDetected').style.display = 'none';
 }
 
 // Show enrollment form for new employees
@@ -296,6 +330,7 @@ function showAttendanceForm(empId) {
     }
     document.getElementById('attendanceForm').style.display = 'block';
     document.getElementById('enrollmentForm').style.display = 'none';
+    document.getElementById('faceNotDetected').style.display = 'none';
 }
 
 // Handle enrollment form submission
@@ -303,6 +338,11 @@ const enrollForm = document.getElementById('faceEnrollForm');
 if (enrollForm) {
     enrollForm.addEventListener('submit', async function(e) {
         e.preventDefault();
+
+        if (!capturedImageData) {
+            alert('Please capture a face first!');
+            return;
+        }
 
         const formData = new FormData(this);
         formData.append('image_data', capturedImageData);
@@ -316,14 +356,14 @@ if (enrollForm) {
             const result = await response.json();
 
             if (result.success) {
-                alert('Employee enrolled successfully! You are now checked in.');
+                alert(`✓ ${result.message}`);
                 location.reload();
             } else {
-                alert('Enrollment failed: ' + (result.error || 'Unknown error'));
+                alert(`✗ Enrollment failed: ${result.message || 'Unknown error'}`);
             }
         } catch (error) {
             console.error('Enrollment error:', error);
-            alert('Enrollment failed. Please try again.');
+            alert('✗ Enrollment failed. Please try again.');
         }
     });
 }
@@ -378,6 +418,12 @@ if (captureBtn) {
         }
     });
 }
+
+// Initialize camera on page load
+document.addEventListener('DOMContentLoaded', async function() {
+    console.log('Page loaded - initializing camera...');
+    await startCamera();
+});
 </script>
 
 {% endblock %}
