@@ -22,11 +22,7 @@
                 <i class="fas fa-user-circle"></i> Mark Attendance
             </a>
             
-            <a href="{{ url_for('enroll') }}" class="btn btn-success" style="font-size:1.3rem; padding:1.2rem 2.8rem; min-width:220px;">
-                <i class="fas fa-user-plus"></i> Enroll Employee
-            </a>
-            
-            {% if session.get('admin') %}
+            {% if session.get('is_admin') %}
             <a href="{{ url_for('admin.dashboard') }}" class="btn" style="background:#7c3aed; font-size:1.3rem; padding:1.2rem 2.8rem; min-width:220px;">
                 <i class="fas fa-shield-alt"></i> Admin Panel
             </a>
@@ -75,9 +71,6 @@
         <div style="display:flex; flex-wrap:wrap; gap:1.5rem; justify-content:center;">
             <a href="{{ url_for('attendance.face_attendance') }}" class="btn btn-primary" style="font-size:1.3rem; padding:1.2rem 3rem;">
                 Start Attendance Now
-            </a>
-            <a href="{{ url_for('enroll') }}" class="btn btn-success" style="font-size:1.3rem; padding:1.2rem 3rem;">
-                Enroll New Employee
             </a>
         </div>
     </div>

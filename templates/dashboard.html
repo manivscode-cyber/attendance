@@ -3,43 +3,45 @@
 {% block title %}Dashboard - GoDigital{% endblock %}
 
 {% block content %}
-
 <div class="glass" style="text-align:center; padding:3rem 2rem;">
     <h1 style="font-size:2.6rem; margin-bottom:0.6rem; background:linear-gradient(135deg,#a78bfa,#7c3aed); -webkit-background-clip:text; -webkit-text-fill-color:transparent;">
         <i class="fas fa-rocket"></i> Welcome, {{ session.get('emp_name', 'Employee') }}
     </h1>
-    <p style="color:var(--muted); font-size:1.2rem; margin-bottom:2.5rem;">Your attendance overview & quick actions</p>
+    <p style="color:var(--muted); font-size:1.1rem; margin-bottom:0.8rem;">Your attendance overview and quick actions</p>
+    <p style="color:var(--muted); margin-bottom:2.2rem;">Current system time: {{ ist_now }}</p>
 
-    <!-- Quick Stats -->
-    <div style="display:grid; grid-template-columns:repeat(auto-fit,minmax(240px,1fr)); gap:1.5rem; margin-bottom:3rem;">
+    <div style="display:grid; grid-template-columns:repeat(auto-fit,minmax(220px,1fr)); gap:1rem; margin-bottom:2.5rem;">
         <div class="glass">
             <h3 style="color:var(--muted); font-size:0.95rem;">Today's Status</h3>
-            <p style="font-size:2.2rem; font-weight:700; color:var(--success); margin:0.8rem 0;">{{ today_status or 'Not Marked' }}</p>
+            <p style="font-size:2rem; font-weight:700; color:var(--success); margin:0.8rem 0;">{{ today_status or 'Not Marked' }}</p>
         </div>
         <div class="glass">
             <h3 style="color:var(--muted); font-size:0.95rem;">Attendance</h3>
-            <p style="font-size:2.2rem; font-weight:700; color:#10b981; margin:0.8rem 0;">{{ today_attendance_status or '-' }}</p>
-            <small style="color:var(--muted);">(On-Time / Late)</small>
+            <p style="font-size:2rem; font-weight:700; color:#10b981; margin:0.8rem 0;">{{ today_attendance_status or '-' }}</p>
+            <small style="color:var(--muted);">On-Time or Late</small>
         </div>
         <div class="glass">
             <h3 style="color:var(--muted); font-size:0.95rem;">Today's Hours</h3>
-            <p style="font-size:2.2rem; font-weight:700; color:var(--warning); margin:0.8rem 0;">{{ today_hours or '0.0' }} h</p>
+            <p style="font-size:2rem; font-weight:700; color:var(--warning); margin:0.8rem 0;">{{ '%.2f'|format(today_hours or 0) }} h</p>
+        </div>
+        <div class="glass">
+            <h3 style="color:var(--muted); font-size:0.95rem;">This Month</h3>
+            <p style="font-size:2rem; font-weight:700; color:#7dd3fc; margin:0.8rem 0;">{{ monthly_days }}</p>
+            <small style="color:var(--muted);">attendance records</small>
         </div>
     </div>
 
-    <!-- Quick Actions -->
-    <div style="display:grid; grid-template-columns:repeat(auto-fit,minmax(280px,1fr)); gap:1.5rem;">
-        <div class="glass action-card" style="cursor:pointer;">
-            <h3><i class="fas fa-user-circle" style="color:#10b981;"></i> Face Attendance</h3>
-            <p style="color:var(--muted); margin-bottom:1.2rem;">Check-in / Check-out using face recognition</p>
-            <a href="{{ url_for('attendance.face_attendance') }}" class="btn btn-primary" style="width:100%; justify-content:center;">Go to Attendance</a>
+    <div style="display:grid; grid-template-columns:repeat(auto-fit,minmax(260px,1fr)); gap:1.25rem;">
+        <div class="glass action-card">
+            <h3><i class="fas fa-camera" style="color:#10b981;"></i> Face Attendance</h3>
+            <p style="color:var(--muted); margin-bottom:1.2rem;">Scan your face to check in or check out automatically.</p>
+            <a href="{{ url_for('attendance.face_attendance') }}" class="btn btn-primary" style="width:100%; justify-content:center;">Open Scanner</a>
         </div>
-        <div class="glass action-card" style="cursor:pointer;">
-            <h3><i class="fas fa-user-circle" style="color:#10b981;"></i> My Profile</h3>
-            <p style="color:var(--muted); margin-bottom:1.2rem;">View your details & history</p>
+        <div class="glass action-card">
+            <h3><i class="fas fa-user-circle" style="color:#7dd3fc;"></i> My Profile</h3>
+            <p style="color:var(--muted); margin-bottom:1.2rem;">View your profile, today’s record, and recent attendance history.</p>
             <a href="{{ url_for('attendance.profile') }}" class="btn btn-primary" style="width:100%; justify-content:center;">View Profile</a>
         </div>
     </div>
 </div>
-
 {% endblock %}

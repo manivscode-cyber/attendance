@@ -12,9 +12,6 @@
             </h1>
             <p style="color:var(--muted); margin:0;">Total Employees: {{ employees|length }}</p>
         </div>
-        <a href="{{ url_for('attendance.enroll') }}" class="btn btn-primary">
-            <i class="fas fa-user-plus"></i> Add New Employee
-        </a>
     </div>
 
     {% with messages = get_flashed_messages(with_categories=true) %}
@@ -78,10 +75,7 @@
     <div class="glass" style="text-align:center; padding:3rem;">
         <i class="fas fa-users" style="font-size:3rem; color:var(--muted); margin-bottom:1rem;"></i>
         <h3 style="color:var(--muted); margin-bottom:1rem;">No Employees Found</h3>
-        <p style="color:var(--muted); margin-bottom:2rem;">Start by enrolling your first employee</p>
-        <a href="{{ url_for('attendance.enroll') }}" class="btn btn-primary">
-            <i class="fas fa-user-plus"></i> Enroll First Employee
-        </a>
+        <p style="color:var(--muted); margin-bottom:2rem;">No employees are available.</p>
     </div>
     {% endif %}
 </div>
