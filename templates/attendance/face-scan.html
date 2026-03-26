@@ -1,0 +1,456 @@
+{% extends 'base.html' %}
+
+{% block title %}GoDigital | Face Scan{% endblock %}
+
+{% block content %}
+<section class="site-shell scan-workspace">
+    <article class="glass-card scanner-console">
+        <div class="scanner-console__header">
+            <div class="scanner-console__copy">
+                <p class="eyebrow">Face Scan</p>
+                <h1>Scan your face</h1>
+            </div>
+        </div>
+
+        <div class="camera-stage camera-stage--pro">
+            <video id="scanVideo" autoplay playsinline muted></video>
+            <canvas id="scanCanvas" hidden></canvas>
+            <div class="scan-ring" aria-hidden="true"></div>
+            <div class="camera-overlay-text" id="scanState">Camera idle</div>
+        </div>
+
+        <div class="scanner-actions-bar">
+            <div class="camera-actions">
+                <button class="button button--ghost" id="startCameraButton" type="button">Start Camera</button>
+                <button class="button" id="scanButton" type="button">Scan Face</button>
+            </div>
+            <p class="scanner-live-note" id="scanReadyNote">
+                <span class="scanner-live-note__dot"></span>
+                <span>Ready for live scan</span>
+            </p>
+        </div>
+
+        <div class="scan-loader" id="scanLoader" hidden>
+            <span></span><span></span><span></span>
+            <p id="scanLoaderText">Processing scan...</p>
+        </div>
+    </article>
+
+    <aside class="glass-card result-card result-card--pro" id="scanResultCard" data-tone="info">
+        <div class="result-card__top">
+            <div>
+                <p class="eyebrow">Recognition Result</p>
+                <h2 id="resultPanelTitle">Verification Console</h2>
+            </div>
+            <span class="result-state result-state--info" id="resultStatePill">Standby</span>
+        </div>
+
+        <div id="resultEmpty" class="result-empty">
+            <div class="result-empty__icon">FR</div>
+            <div class="result-empty__content">
+                <h3 id="resultEmptyTitle">Awaiting live scan</h3>
+                <p class="support-copy" id="resultEmptyCopy">Position one face inside the frame and capture once. Attendance updates and exception messages will appear here.</p>
+            </div>
+        </div>
+
+        <div id="resultBody" hidden>
+            <div class="result-person result-person--pro">
+                <img id="resultPhoto" alt="Employee photo" hidden>
+                <span class="avatar avatar--large" id="resultInitials">GD</span>
+                <div class="result-person__copy">
+                    <h3 id="resultName">Employee Name</h3>
+                    <p id="resultPhone" class="support-copy">Phone</p>
+                </div>
+            </div>
+
+            <div class="detail-list detail-list--pro">
+                <div>
+                    <span>Department</span>
+                    <strong id="resultDepartment">General</strong>
+                </div>
+                <div>
+                    <span>Work Mode</span>
+                    <strong><span class="badge badge--muted" id="resultWorkMode">--</span></strong>
+                </div>
+                <div>
+                    <span>Action</span>
+                    <strong id="resultAction">Check In</strong>
+                </div>
+                <div>
+                    <span>Check In</span>
+                    <strong id="resultCheckIn">--</strong>
+                </div>
+                <div>
+                    <span>Check Out</span>
+                    <strong id="resultCheckOut">--</strong>
+                </div>
+                <div>
+                    <span>Total Hours</span>
+                    <strong id="resultHours">--</strong>
+                </div>
+                <div>
+                    <span>Status</span>
+                    <strong><span class="badge badge--info" id="resultStatus">Pending</span></strong>
+                </div>
+            </div>
+        </div>
+
+        <div class="scan-work-mode" id="workModePrompt" hidden>
+            <div class="scan-work-mode__copy">
+                <strong>Choose today's work mode</strong>
+                <p class="support-copy">Select Onsite, WFH, or Field before attendance is recorded.</p>
+            </div>
+            <div class="scan-work-mode__controls">
+                <select id="workModeSelect" class="scan-work-mode__select" aria-label="Today's work mode">
+                    {% for work_mode in work_mode_options %}
+                    <option value="{{ work_mode }}">{{ work_mode }}</option>
+                    {% endfor %}
+                </select>
+                <button class="button" id="confirmWorkModeButton" type="button">Confirm Attendance</button>
+            </div>
+        </div>
+
+        <div class="result-alert result-alert--info" id="resultAlert" hidden></div>
+        <div class="result-message" id="resultMessage">Camera started. Capture a face when ready.</div>
+        <a class="button button--ghost result-link" id="resultLink" href="{{ url_for('enroll_page') }}" hidden>Go to Enroll</a>
+    </aside>
+</section>
+{% endblock %}
+
+{% block extra_scripts %}
+<script>
+(() => {
+    const video = document.getElementById('scanVideo');
+    const canvas = document.getElementById('scanCanvas');
+    const stateText = document.getElementById('scanState');
+    const scanLoader = document.getElementById('scanLoader');
+    const startButton = document.getElementById('startCameraButton');
+    const scanButton = document.getElementById('scanButton');
+    const resultBody = document.getElementById('resultBody');
+    const resultEmpty = document.getElementById('resultEmpty');
+    const resultEmptyTitle = document.getElementById('resultEmptyTitle');
+    const resultEmptyCopy = document.getElementById('resultEmptyCopy');
+    const resultPanelTitle = document.getElementById('resultPanelTitle');
+    const resultStatePill = document.getElementById('resultStatePill');
+    const resultAlert = document.getElementById('resultAlert');
+    const resultMessage = document.getElementById('resultMessage');
+    const resultLink = document.getElementById('resultLink');
+    const resultPhoto = document.getElementById('resultPhoto');
+    const resultInitials = document.getElementById('resultInitials');
+    const resultCard = document.getElementById('scanResultCard');
+    const scanReadyNote = document.getElementById('scanReadyNote');
+    const scanLoaderText = document.getElementById('scanLoaderText');
+    const workModePrompt = document.getElementById('workModePrompt');
+    const workModeSelect = document.getElementById('workModeSelect');
+    const confirmWorkModeButton = document.getElementById('confirmWorkModeButton');
+    const csrfToken = document.querySelector('meta[name="csrf-token"]')?.content || '';
+
+    let stream = null;
+    let pendingEmployeeId = '';
+
+    function setBusy(isBusy, message) {
+        scanLoader.hidden = !isBusy;
+        scanButton.disabled = isBusy;
+        startButton.disabled = isBusy;
+        stateText.textContent = message;
+        scanReadyNote.hidden = isBusy;
+        scanLoaderText.textContent = isBusy ? 'Processing scan...' : '';
+    }
+
+    async function startCamera() {
+        if (stream) {
+            stream.getTracks().forEach((track) => track.stop());
+        }
+
+        try {
+            stream = await navigator.mediaDevices.getUserMedia({
+                video: { facingMode: 'user', width: { ideal: 960 }, height: { ideal: 960 } },
+                audio: false
+            });
+            video.srcObject = stream;
+            await video.play();
+            stateText.textContent = 'Camera ready';
+            showScanReady('Camera started. Capture a face when ready.');
+        } catch (error) {
+            stateText.textContent = 'Camera unavailable';
+            showScanReady('Camera access failed. Allow webcam permission and try again.');
+        }
+    }
+
+    function captureFrame() {
+        if (!video.videoWidth || !video.videoHeight) {
+            throw new Error('Camera is not ready yet.');
+        }
+
+        const sourceWidth = video.videoWidth;
+        const sourceHeight = video.videoHeight;
+        const cropSize = Math.round(Math.min(sourceWidth, sourceHeight) * 0.76);
+        const cropX = Math.max(0, Math.round((sourceWidth - cropSize) / 2));
+        const cropY = Math.max(0, Math.round((sourceHeight - cropSize) / 2));
+
+        canvas.width = cropSize;
+        canvas.height = cropSize;
+        const context = canvas.getContext('2d');
+        context.drawImage(
+            video,
+            cropX,
+            cropY,
+            cropSize,
+            cropSize,
+            0,
+            0,
+            canvas.width,
+            canvas.height
+        );
+        return canvas.toDataURL('image/jpeg', 0.85);
+    }
+
+    function setStatusBadge(status) {
+        const badge = document.getElementById('resultStatus');
+        badge.textContent = status || 'Pending';
+        badge.className = `badge badge--${status === 'On Time' ? 'success' : status === 'Late' ? 'danger' : 'info'}`;
+    }
+
+    function workModeTone(workMode) {
+        const normalized = (workMode || '').trim().toLowerCase();
+        if (normalized === 'onsite') {
+            return 'success';
+        }
+        if (normalized === 'wfh') {
+            return 'info';
+        }
+        if (normalized === 'field') {
+            return 'warning';
+        }
+        return 'muted';
+    }
+
+    function setWorkModeBadge(workMode) {
+        const badge = document.getElementById('resultWorkMode');
+        badge.textContent = workMode || '--';
+        badge.className = `badge badge--${workModeTone(workMode)}`;
+    }
+
+    function setResultTone(label, tone = 'info') {
+        resultStatePill.textContent = label;
+        resultStatePill.className = `result-state result-state--${tone}`;
+        resultCard.dataset.tone = tone;
+    }
+
+    function setAlert(message = '', tone = 'info', visible = false) {
+        resultAlert.hidden = !visible;
+        resultAlert.textContent = message;
+        resultAlert.className = `result-alert result-alert--${tone}`;
+    }
+
+    function setEnrollLink(visible, label = 'Go to Enroll') {
+        resultLink.hidden = !visible;
+        resultLink.textContent = label;
+    }
+
+    function clearPendingWorkMode() {
+        pendingEmployeeId = '';
+        workModePrompt.hidden = true;
+        confirmWorkModeButton.disabled = false;
+    }
+
+    function renderEmployee(employee) {
+        document.getElementById('resultName').textContent = employee.name || 'Unknown Employee';
+        document.getElementById('resultPhone').textContent = employee.phone || '--';
+        document.getElementById('resultDepartment').textContent = employee.department || 'General';
+
+        resultInitials.textContent = employee.initials || 'GD';
+        if (employee.photo_url) {
+            resultPhoto.src = employee.photo_url;
+            resultPhoto.hidden = false;
+            resultInitials.hidden = true;
+        } else {
+            resultPhoto.hidden = true;
+            resultInitials.hidden = false;
+        }
+    }
+
+    function showResult(payload) {
+        const employee = payload.employee || {};
+        const attendance = payload.attendance || {};
+        const action = payload.action || 'recognized';
+        const actionLabelMap = {
+            check_in: 'Check In Recorded',
+            check_out: 'Check Out Recorded',
+            already_marked: 'Already Recorded'
+        };
+        const actionToneMap = {
+            check_in: 'success',
+            check_out: 'info',
+            already_marked: 'danger'
+        };
+
+        clearPendingWorkMode();
+        resultEmpty.hidden = true;
+        resultBody.hidden = false;
+        resultPanelTitle.textContent = actionLabelMap[action] || 'Attendance Updated';
+
+        renderEmployee(employee);
+        setWorkModeBadge(attendance.work_mode || employee.work_mode || '--');
+        document.getElementById('resultAction').textContent = actionLabelMap[action] || action.replaceAll('_', ' ');
+        document.getElementById('resultCheckIn').textContent = attendance.check_in_label || '--';
+        document.getElementById('resultCheckOut').textContent = attendance.check_out_label || '--';
+        document.getElementById('resultHours').textContent = attendance.hours_label || '--';
+        setStatusBadge(attendance.status || 'Pending');
+        setResultTone(
+            action === 'already_marked' ? 'Already Recorded' : 'Verified',
+            actionToneMap[action] || 'info'
+        );
+        setAlert(
+            action === 'already_marked'
+                ? 'You have already recorded attendance today.'
+                : payload.message || 'Attendance updated successfully.',
+            actionToneMap[action] || 'info',
+            true
+        );
+        setEnrollLink(false);
+
+        resultMessage.textContent = payload.message || 'Scan complete.';
+    }
+
+    function showWorkModePrompt(payload) {
+        const employee = payload.employee || {};
+        pendingEmployeeId = employee.employee_id || '';
+
+        resultEmpty.hidden = true;
+        resultBody.hidden = false;
+        renderEmployee(employee);
+        resultPanelTitle.textContent = 'Choose Today\'s Work Mode';
+        document.getElementById('resultAction').textContent = payload.pending_action_label || 'Ready to Record';
+        document.getElementById('resultCheckIn').textContent = '--';
+        document.getElementById('resultCheckOut').textContent = '--';
+        document.getElementById('resultHours').textContent = '--';
+        setStatusBadge('Pending');
+
+        const selectedWorkMode = payload.selected_work_mode || 'Onsite';
+        workModeSelect.value = selectedWorkMode;
+        setWorkModeBadge(selectedWorkMode);
+        setResultTone('Choose Work Mode', 'warning');
+        setAlert(
+            payload.message || 'Select today\'s work mode to continue.',
+            'warning',
+            true
+        );
+        resultMessage.textContent = payload.message || 'Select today\'s work mode to continue.';
+        setEnrollLink(false);
+        workModePrompt.hidden = false;
+    }
+
+    function showEnrollPrompt(message) {
+        clearPendingWorkMode();
+        resultBody.hidden = true;
+        resultEmpty.hidden = false;
+        resultPanelTitle.textContent = 'Enroll Required';
+        resultEmptyTitle.textContent = 'You should enroll first';
+        resultEmptyCopy.textContent = 'This face is not registered in the attendance system yet. Please open the enroll page and capture the face profile first.';
+        setResultTone('Enroll First', 'warning');
+        setAlert(message || 'This face is not enrolled yet. You should enroll first.', 'warning', true);
+        resultMessage.textContent = message || 'This face is not enrolled yet. You should enroll first.';
+        setEnrollLink(true, 'Go to Enroll');
+    }
+
+    function showScanReady(message) {
+        clearPendingWorkMode();
+        resultBody.hidden = true;
+        resultEmpty.hidden = false;
+        resultPanelTitle.textContent = 'Verification Console';
+        resultEmptyTitle.textContent = 'Awaiting live scan';
+        resultEmptyCopy.textContent = 'Position one face inside the frame and capture once. Attendance updates and exception messages will appear here.';
+        setResultTone('Standby', 'info');
+        setAlert('', 'info', false);
+        resultMessage.textContent = message || 'Waiting for a scan.';
+        setEnrollLink(false);
+    }
+
+    async function confirmWorkMode() {
+        if (!pendingEmployeeId) {
+            showScanReady('Scan a face first, then choose today\'s work mode.');
+            return;
+        }
+
+        try {
+            setBusy(true, 'Saving attendance...');
+            confirmWorkModeButton.disabled = true;
+
+            const response = await fetch('{{ url_for("api_scan") }}', {
+                method: 'POST',
+                headers: {
+                    'Content-Type': 'application/json',
+                    'X-CSRF-Token': csrfToken
+                },
+                body: JSON.stringify({
+                    employee_id: pendingEmployeeId,
+                    work_mode: workModeSelect.value
+                })
+            });
+            const payload = await response.json();
+
+            if (response.ok && payload.success) {
+                showResult(payload);
+            } else {
+                showScanReady(payload.message || 'Attendance could not be recorded.');
+            }
+        } catch (error) {
+            showScanReady(error.message || 'Attendance could not be recorded.');
+        } finally {
+            setBusy(false, 'Camera ready');
+        }
+    }
+
+    async function scanFace() {
+        try {
+            const imageData = captureFrame();
+            setBusy(true, 'Scanning...');
+
+            const response = await fetch('{{ url_for("api_scan") }}', {
+                method: 'POST',
+                headers: {
+                    'Content-Type': 'application/json',
+                    'X-CSRF-Token': csrfToken
+                },
+                body: JSON.stringify({ image_data: imageData })
+            });
+            const payload = await response.json();
+
+            if (response.ok && payload.success && payload.requires_work_mode) {
+                showWorkModePrompt(payload);
+            } else if (response.ok && payload.success) {
+                showResult(payload);
+            } else if (payload.code === 'no_registered_faces' || payload.code === 'face_not_found') {
+                showEnrollPrompt(payload.message);
+            } else {
+                showScanReady(payload.message || 'Scan failed.');
+            }
+        } catch (error) {
+            showScanReady(error.message || 'Scan failed.');
+        } finally {
+            setBusy(false, 'Camera ready');
+        }
+    }
+
+    startButton.addEventListener('click', startCamera);
+    scanButton.addEventListener('click', async () => {
+        if (!video.srcObject) {
+            await startCamera();
+        }
+        await scanFace();
+    });
+    workModeSelect.addEventListener('change', () => {
+        setWorkModeBadge(workModeSelect.value);
+    });
+    confirmWorkModeButton.addEventListener('click', confirmWorkMode);
+
+    window.addEventListener('load', startCamera);
+    window.addEventListener('beforeunload', () => {
+        if (stream) {
+            stream.getTracks().forEach((track) => track.stop());
+        }
+    });
+})();
+</script>
+{% endblock %}

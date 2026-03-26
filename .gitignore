@@ -9,5 +9,7 @@ instance/
 *.db
 *.sqlite3
 *.sqlite
+.env
+static/uploads/
 .DS_Store
 *.log

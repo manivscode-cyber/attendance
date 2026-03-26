@@ -1,0 +1,110 @@
+{% extends 'base.html' %}
+{% from 'includes/stats-card.html' import stat_card %}
+
+{% block title %}GoDigital Attendance | Company Today{% endblock %}
+
+{% block content %}
+{% set hero_kicker = 'Company Today Monitor' %}
+{% set hero_title = 'Live company attendance for ' ~ (today_label or 'today') %}
+{% set hero_subtitle = "Monitor today's attendance activity, latest entries, and current company coverage from one live manager view." %}
+{% set hero_actions = [
+    {'href': url_for('admin.admin_dashboard'), 'label': 'Manager Dashboard', 'class': ''},
+    {'href': url_for('admin.daily_report'), 'label': 'Daily Report', 'class': 'btn-primary'}
+] %}
+{% set hero_summary_kicker = 'Coverage' %}
+{% set hero_summary_title = (today_present or 0) ~ ' present' %}
+{% set hero_summary_lines = [
+    (today_checked_out or 0) ~ ' checked out',
+    (open_sessions or 0) ~ ' open shifts',
+    (today_absent or 0) ~ ' absent'
+] %}
+{% include 'partials/hero-section.html' %}
+
+<section class="stats-grid section-shell">
+    {{ stat_card('Employees', employees|length or 0, 'accent', 'Registered in the system') }}
+    {{ stat_card('Present today', today_present or 0, 'success', 'Employees with a check-in') }}
+    {{ stat_card('Checked out', today_checked_out or 0, 'warning', 'Completed shifts today') }}
+    {{ stat_card('Open shifts', open_sessions or 0, 'accent', 'Employees still checked in') }}
+    {{ stat_card('Attendance rate', attendance_rate or 0, 'accent', 'Present vs. total employees', '%') }}
+</section>
+
+<section class="page-grid section-shell">
+    <article class="glass">
+        <div class="section-head">
+            <div>
+                <h2>Today&apos;s attendance records</h2>
+                <p>All attendance entries recorded for the current day.</p>
+            </div>
+        </div>
+
+        {% if attendance_records %}
+        <div class="table-wrap">
+            <table class="modern-table">
+                <thead>
+                    <tr>
+                        <th>Employee ID</th>
+                        <th>Name</th>
+                        <th>Department</th>
+                        <th>Status</th>
+                        <th>Check-in</th>
+                        <th>Check-out</th>
+                        <th>Hours</th>
+                    </tr>
+                </thead>
+                <tbody>
+                    {% for record in attendance_records %}
+                    {% set record_status = record.status or 'Pending' %}
+                    <tr>
+                        <td class="table-strong">{{ record.employee.emp_id if record.employee else '-' }}</td>
+                        <td>{{ record.employee.name if record.employee else '-' }}</td>
+                        <td>{{ record.department or (record.employee.department if record.employee else 'General') or 'General' }}</td>
+                        <td>
+                            <span class="status-badge {{ record.badge_class }}">
+                                {{ record_status }}
+                            </span>
+                        </td>
+                        <td>{{ record.check_in or '-' }}</td>
+                        <td>{{ record.check_out or '-' }}</td>
+                        <td>{{ '%.2f'|format(record.effective_total_hours or 0) }} h</td>
+                    </tr>
+                    {% endfor %}
+                </tbody>
+            </table>
+        </div>
+        {% else %}
+        <div class="empty-state">No attendance records have been captured yet today.</div>
+        {% endif %}
+    </article>
+
+    <article class="glass-card">
+        <div class="section-head">
+            <div>
+                <h2>Recent activity feed</h2>
+                <p>Latest attendance actions across the company.</p>
+            </div>
+        </div>
+
+        {% if recent_attendance_records %}
+        <div class="feed-list">
+            {% for record in recent_attendance_records %}
+            {% set record_status = record.status or 'Pending' %}
+            <article class="feed-item">
+                <div>
+                    <strong>{{ record.employee.name if record.employee else 'Employee' }}</strong>
+                    <p>{{ record.date.strftime('%Y-%m-%d') if record.date else '-' }} - {{ record.department or (record.employee.department if record.employee else 'General') or 'General' }}</p>
+                </div>
+                <div class="feed-item__meta">
+                    <span class="status-badge {{ record.badge_class }}">
+                        {{ record_status }}
+                    </span>
+                    <span>{{ record.check_out or record.check_in or '-' }}</span>
+                </div>
+            </article>
+            {% endfor %}
+        </div>
+    {% else %}
+        <div class="empty-state">No recent attendance activity is available yet.</div>
+    {% endif %}
+    </article>
+</section>
+{% endblock %}

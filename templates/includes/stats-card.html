@@ -1,0 +1,11 @@
+{% macro stat_card(label, value, tone='', helper='', suffix='') -%}
+<article class="stat-card glass-card{% if tone %} stat-card--{{ tone }}{% endif %}">
+    <span class="stat-card__label">{{ label }}</span>
+    <strong class="stat-card__value">
+        {{ value }}{% if suffix %}<span>{{ suffix }}</span>{% endif %}
+    </strong>
+    {% if helper %}
+    <p class="stat-card__helper">{{ helper }}</p>
+    {% endif %}
+</article>
+{%- endmacro %}

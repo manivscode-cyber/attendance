@@ -1,0 +1,291 @@
+{% set camera_widget_id = camera_widget_id|default('camera-widget') %}
+{% set camera_attendance_options = camera_attendance_options|default(['Onsite', 'Field', 'WFH']) %}
+
+<section class="camera-widget glass-card" data-camera-root="{{ camera_widget_id }}" aria-label="{{ camera_title|default('Camera widget') }}">
+    <div class="camera-frame" data-camera-frame>
+        <video class="camera-video" data-camera-video autoplay playsinline muted aria-label="{{ camera_title|default('Camera preview') }}"></video>
+        <canvas data-camera-canvas hidden></canvas>
+        <div class="camera-overlay" aria-hidden="true"></div>
+        <div class="camera-overlay-message info" data-camera-overlay role="status" aria-live="polite">
+            {{ camera_overlay_message|default('Camera starting...') }}
+        </div>
+    </div>
+
+    <div class="camera-toolbar">
+        <div class="camera-toolbar__group">
+            <button type="button" class="btn" data-camera-start>{{ camera_start_label|default('Start camera') }}</button>
+            <button type="button" class="btn btn-primary" data-camera-capture>{{ camera_capture_label|default('Scan face') }}</button>
+        </div>
+
+        {% if camera_show_work_mode %}
+        <label class="form-field form-field--inline">
+            <span>{{ camera_work_mode_label|default('Attendance type') }}</span>
+            <select data-camera-attendance-type name="{{ camera_work_mode_name|default('attendance_type') }}">
+                {% for option in camera_attendance_options %}
+                <option value="{{ option }}" {% if option == camera_selected_attendance_type %}selected{% endif %}>{{ option }}</option>
+                {% endfor %}
+            </select>
+        </label>
+        {% endif %}
+    </div>
+
+    <p class="camera-status info" data-camera-status role="status" aria-live="polite">
+        {{ camera_status_message|default('Allow browser camera access to begin.') }}
+    </p>
+
+    {% if camera_facts %}
+    <div class="camera-facts">
+        {% for fact in camera_facts %}
+        <div class="camera-fact">
+            <small>{{ fact.label }}</small>
+            <strong>{{ fact.value }}</strong>
+        </div>
+        {% endfor %}
+    </div>
+    {% endif %}
+</section>
+
+<script>
+if (!window.GoDigitalCameraWidget) {
+    window.GoDigitalCameraWidget = {
+        create(root) {
+            if (!root) {
+                throw new Error('Camera widget root not found.');
+            }
+
+            const elements = {
+                frame: root.querySelector('[data-camera-frame]'),
+                video: root.querySelector('[data-camera-video]'),
+                canvas: root.querySelector('[data-camera-canvas]'),
+                overlay: root.querySelector('[data-camera-overlay]'),
+                status: root.querySelector('[data-camera-status]'),
+                startButton: root.querySelector('[data-camera-start]'),
+                captureButton: root.querySelector('[data-camera-capture]'),
+                attendanceType: root.querySelector('[data-camera-attendance-type]')
+            };
+
+            let stream = null;
+            let starting = false;
+
+            function setTone(element, baseClass, tone) {
+                if (!element) {
+                    return;
+                }
+                element.className = `${baseClass} ${tone || 'info'}`;
+            }
+
+            function setStatus(message, tone = 'info') {
+                if (!elements.status) {
+                    return;
+                }
+                setTone(elements.status, 'camera-status', tone);
+                elements.status.textContent = message;
+            }
+
+            function setOverlay(message, hidden = false, tone = 'info') {
+                if (!elements.overlay) {
+                    return;
+                }
+                setTone(elements.overlay, 'camera-overlay-message', tone);
+                elements.overlay.hidden = !!hidden;
+                elements.overlay.textContent = message;
+            }
+
+            function setDetected(detected) {
+                if (elements.frame) {
+                    elements.frame.classList.toggle('is-detected', !!detected);
+                }
+            }
+
+            async function waitForVideoReady(timeoutMs = 5000) {
+                const video = elements.video;
+                return new Promise((resolve, reject) => {
+                    if (video.videoWidth && video.videoHeight && video.readyState >= 2) {
+                        resolve(true);
+                        return;
+                    }
+
+                    const timeout = window.setTimeout(() => {
+                        cleanup();
+                        reject(new Error('Camera preview did not start. Tap Start camera and allow permission if prompted.'));
+                    }, timeoutMs);
+
+                    function onReady() {
+                        if (video.videoWidth && video.videoHeight) {
+                            cleanup();
+                            resolve(true);
+                        }
+                    }
+
+                    function cleanup() {
+                        window.clearTimeout(timeout);
+                        video.removeEventListener('loadedmetadata', onReady);
+                        video.removeEventListener('canplay', onReady);
+                    }
+
+                    video.addEventListener('loadedmetadata', onReady);
+                    video.addEventListener('canplay', onReady);
+                });
+            }
+
+            async function start() {
+                if (stream || starting) {
+                    return true;
+                }
+
+                if (!navigator.mediaDevices || !navigator.mediaDevices.getUserMedia) {
+                    setOverlay('This browser does not support camera access.', false, 'error');
+                    setStatus('This browser does not support camera access.', 'error');
+                    return false;
+                }
+
+                starting = true;
+                setOverlay('Requesting camera access...', false, 'info');
+                setStatus('Allow browser camera access to begin.', 'info');
+
+                const attempts = [
+                    {
+                        video: {
+                            width: { ideal: 720 },
+                            height: { ideal: 960 },
+                            facingMode: 'user'
+                        },
+                        audio: false
+                    },
+                    {
+                        video: {
+                            width: { ideal: 720 },
+                            height: { ideal: 960 }
+                        },
+                        audio: false
+                    },
+                    { video: true, audio: false }
+                ];
+
+                try {
+                    let lastError = null;
+                    for (const constraints of attempts) {
+                        try {
+                            stream = await navigator.mediaDevices.getUserMedia(constraints);
+                            break;
+                        } catch (error) {
+                            lastError = error;
+                        }
+                    }
+
+                    if (!stream) {
+                        throw lastError || new Error('Unable to connect to a camera.');
+                    }
+
+                    elements.video.srcObject = stream;
+                    elements.video.muted = true;
+                    elements.video.setAttribute('muted', '');
+                    elements.video.setAttribute('autoplay', '');
+                    elements.video.setAttribute('playsinline', '');
+
+                    try {
+                        await elements.video.play();
+                    } catch (playError) {
+                        console.warn('Camera play warning:', playError);
+                    }
+
+                    await waitForVideoReady();
+                    setOverlay('Camera ready', true, 'success');
+                    setStatus('Camera ready. Keep one face centered inside the frame.', 'info');
+                    return true;
+                } catch (error) {
+                    const permissionErrors = ['NotAllowedError', 'PermissionDeniedError', 'SecurityError'];
+                    const deviceErrors = ['NotFoundError', 'DevicesNotFoundError', 'OverconstrainedError', 'NotReadableError', 'TrackStartError'];
+                    let message = error && error.message ? error.message : 'Unknown camera error.';
+
+                    if (window.location.protocol !== 'https:' && window.location.hostname !== 'localhost' && window.location.hostname !== '127.0.0.1') {
+                        message = 'HTTPS is required for camera access on most mobile browsers.';
+                    } else if (permissionErrors.includes(error && error.name)) {
+                        message = 'Camera permission was blocked. Allow access in the browser and try again.';
+                    } else if (deviceErrors.includes(error && error.name)) {
+                        message = 'No usable camera was found. Close other apps using the webcam and retry.';
+                    }
+
+                    setOverlay(message, false, 'error');
+                    setStatus(message, 'error');
+                    return false;
+                } finally {
+                    starting = false;
+                }
+            }
+
+            function stop() {
+                if (stream) {
+                    stream.getTracks().forEach((track) => track.stop());
+                    stream = null;
+                }
+
+                if (elements.video) {
+                    elements.video.srcObject = null;
+                }
+
+                setDetected(false);
+                setOverlay('Camera stopped. Tap Start camera to begin again.', false, 'info');
+            }
+
+            function captureFrame(options = {}) {
+                const video = elements.video;
+                const canvas = elements.canvas;
+                if (!video.videoWidth || !video.videoHeight) {
+                    throw new Error('Camera is not ready yet. Please wait a moment and try again.');
+                }
+
+                const cropWidthRatio = options.cropWidthRatio || 0.92;
+                const cropHeightRatio = options.cropHeightRatio || 0.96;
+                const quality = options.quality || 0.68;
+                const maxWidth = options.maxWidth || 720;
+
+                const sourceWidth = video.videoWidth;
+                const sourceHeight = video.videoHeight;
+                const cropWidth = Math.round(sourceWidth * cropWidthRatio);
+                const cropHeight = Math.round(sourceHeight * cropHeightRatio);
+                const cropX = Math.max(0, Math.round((sourceWidth - cropWidth) / 2));
+                const cropY = Math.max(0, Math.round((sourceHeight - cropHeight) / 2));
+                const scale = Math.min(1, maxWidth / cropWidth);
+
+                canvas.width = Math.max(1, Math.round(cropWidth * scale));
+                canvas.height = Math.max(1, Math.round(cropHeight * scale));
+
+                const context = canvas.getContext('2d');
+                context.drawImage(video, cropX, cropY, cropWidth, cropHeight, 0, 0, canvas.width, canvas.height);
+                return canvas.toDataURL('image/jpeg', quality);
+            }
+
+            function getAttendanceType() {
+                return elements.attendanceType ? elements.attendanceType.value : 'Onsite';
+            }
+
+            function setStartLabel(label) {
+                if (elements.startButton) {
+                    elements.startButton.textContent = label;
+                }
+            }
+
+            function setCaptureLabel(label) {
+                if (elements.captureButton) {
+                    elements.captureButton.textContent = label;
+                }
+            }
+
+            return {
+                root,
+                elements,
+                start,
+                stop,
+                captureFrame,
+                getAttendanceType,
+                setStatus,
+                setOverlay,
+                setDetected,
+                setStartLabel,
+                setCaptureLabel
+            };
+        }
+    };
+}
+</script>

@@ -1,0 +1,123 @@
+{% extends 'base.html' %}
+
+{% block title %}GoDigital | History{% endblock %}
+
+{% block content %}
+<section class="site-shell hero-panel">
+    <div class="hero-copy">
+        <p class="eyebrow">Attendance History</p>
+        <h1>Review attendance across days and employees</h1>
+        <p class="hero-text">Use the filters below to inspect attendance records, hours, and punctuality trends.</p>
+    </div>
+</section>
+
+<section class="site-shell stats-grid stats-grid--compact">
+    <article class="glass-card stat-card">
+        <span>Records</span>
+        <strong>{{ summary.records }}</strong>
+        <small>Total filtered entries</small>
+    </article>
+    <article class="glass-card stat-card stat-card--blue">
+        <span>On Time</span>
+        <strong>{{ summary.on_time }}</strong>
+        <small>Punctual check-ins</small>
+    </article>
+    <article class="glass-card stat-card stat-card--red">
+        <span>Late</span>
+        <strong>{{ summary.late }}</strong>
+        <small>Delayed check-ins</small>
+    </article>
+    <article class="glass-card stat-card stat-card--gold">
+        <span>Total Hours</span>
+        <strong>{{ '%.2f'|format(summary.hours) }}</strong>
+        <small>Worked time across results</small>
+    </article>
+</section>
+
+<section class="site-shell section-card">
+    <form class="filter-grid" method="get">
+        <label>
+            <span>Start Date</span>
+            <input type="date" name="start_date" value="{{ filters.start_date }}">
+        </label>
+        <label>
+            <span>End Date</span>
+            <input type="date" name="end_date" value="{{ filters.end_date }}">
+        </label>
+        <label>
+            <span>Employee</span>
+            <select name="employee_id">
+                <option value="">All Employees</option>
+                {% for employee in employees %}
+                <option value="{{ employee.employee_id }}" {% if employee.employee_id == filters.employee_id %}selected{% endif %}>
+                    {{ employee.name }} ({{ employee.employee_id }})
+                </option>
+                {% endfor %}
+            </select>
+        </label>
+        <div class="filter-actions">
+            <button class="button" type="submit">Apply Filters</button>
+            {% if manager_session_active %}
+            <a class="button button--ghost" href="{{ url_for('api_export_csv', start_date=filters.start_date, end_date=filters.end_date, employee_id=filters.employee_id) }}">Export Excel</a>
+            {% else %}
+            <a class="button button--ghost" href="{{ url_for('manager_access_page', next=url_for('api_export_csv', start_date=filters.start_date, end_date=filters.end_date, employee_id=filters.employee_id)) }}">Unlock Manager to Export Excel</a>
+            {% endif %}
+        </div>
+    </form>
+</section>
+
+<section class="site-shell section-card">
+    <div class="table-shell">
+        <table class="data-table">
+            <thead>
+                <tr>
+                    <th>Name</th>
+                    <th>Work Mode</th>
+                    <th>Date</th>
+                    <th>Check In</th>
+                    <th>Check Out</th>
+                    <th>Hours</th>
+                    <th>Status</th>
+                    <th>Type</th>
+                </tr>
+            </thead>
+            <tbody>
+                {% for record in records %}
+                <tr>
+                    <td>
+                        <div class="table-person">
+                            <span class="avatar avatar--tiny">{{ record.initials }}</span>
+                            <div>
+                                <strong>{{ record.name }}</strong>
+                                <small>
+                                    {% if record.department and record.work_mode %}
+                                        {{ record.department }} | {{ record.work_mode }}
+                                    {% elif record.department %}
+                                        {{ record.department }}
+                                    {% elif record.work_mode %}
+                                        {{ record.work_mode }}
+                                    {% else %}
+                                        --
+                                    {% endif %}
+                                </small>
+                            </div>
+                        </div>
+                    </td>
+                    <td><span class="badge badge--{{ record.work_mode_tone }}">{{ record.work_mode }}</span></td>
+                    <td>{{ record.date_label }}</td>
+                    <td>{{ record.check_in_label }}</td>
+                    <td>{{ record.check_out_label }}</td>
+                    <td>{{ record.hours_label }}</td>
+                    <td><span class="badge badge--{{ record.status_tone }}">{{ record.status }}</span></td>
+                    <td><span class="badge badge--{{ record.attendance_type_tone }}">{{ record.attendance_type }}</span></td>
+                </tr>
+                {% else %}
+                <tr>
+                    <td colspan="8" class="empty-row">No records matched the selected filters.</td>
+                </tr>
+                {% endfor %}
+            </tbody>
+        </table>
+    </div>
+</section>
+{% endblock %}

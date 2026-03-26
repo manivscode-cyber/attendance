@@ -1,0 +1,234 @@
+{% extends 'base.html' %}
+
+{% block title %}GoDigital | Dashboard{% endblock %}
+
+{% block content %}
+<section class="site-shell hero-panel">
+    <div class="hero-copy">
+        <p class="eyebrow">GoDigital Command View</p>
+        <h1>Today - {{ hero_date_label }}</h1>
+        <p class="hero-text">Track live presence, punctuality, and half-day status from one polished attendance dashboard.</p>
+    </div>
+    <div class="hero-meta-card glass-card">
+        <span>IST Live</span>
+        <strong id="lastUpdated">{{ today_bundle.last_updated }}</strong>
+    </div>
+</section>
+
+<section class="site-shell stats-grid" id="statsGrid">
+    <article class="glass-card stat-card">
+        <span>Present Today</span>
+        <strong data-stat="present_today">{{ today_bundle.present_today }}</strong>
+        <small>Employees checked in today</small>
+    </article>
+    <article class="glass-card stat-card stat-card--blue">
+        <span>On Time</span>
+        <strong data-stat="on_time">{{ today_bundle.on_time }}</strong>
+        <small>Check-ins before 10:00 AM IST</small>
+    </article>
+    <article class="glass-card stat-card stat-card--red">
+        <span>Late</span>
+        <strong data-stat="late">{{ today_bundle.late }}</strong>
+        <small>Check-ins after the cutoff</small>
+    </article>
+    <article class="glass-card stat-card stat-card--gold">
+        <span>Half Day</span>
+        <strong data-stat="half_day">{{ today_bundle.half_day }}</strong>
+        <small>Employees under four working hours</small>
+    </article>
+</section>
+
+<section class="site-shell section-card">
+    <div class="section-head">
+        <div>
+            <p class="eyebrow">Live Attendance</p>
+            <h2>Today's attendance list</h2>
+        </div>
+        <a class="button button--ghost" href="{{ url_for('scan_page') }}">Open Face Scan</a>
+    </div>
+
+    <div class="table-shell">
+        <table class="data-table">
+            <thead>
+                <tr>
+                    <th>Name</th>
+                    <th>Work Mode</th>
+                    <th>Check In</th>
+                    <th>Check Out</th>
+                    <th>Hours</th>
+                    <th>Status</th>
+                </tr>
+            </thead>
+            <tbody id="todayAttendanceTable">
+                {% for record in today_bundle.records %}
+                <tr>
+                    <td>
+                        <div class="table-person">
+                            <span class="avatar avatar--tiny">{{ record.initials }}</span>
+                            <div>
+                                <strong>{{ record.name }}</strong>
+                                <small>
+                                    {% if record.department and record.work_mode %}
+                                        {{ record.department }} | {{ record.work_mode }}
+                                    {% elif record.department %}
+                                        {{ record.department }}
+                                    {% elif record.work_mode %}
+                                        {{ record.work_mode }}
+                                    {% else %}
+                                        --
+                                    {% endif %}
+                                </small>
+                            </div>
+                        </div>
+                    </td>
+                    <td><span class="badge badge--{{ record.work_mode_tone }}">{{ record.work_mode }}</span></td>
+                    <td>{{ record.check_in_label }}</td>
+                    <td>{{ record.check_out_label }}</td>
+                    <td>
+                        {{ record.hours_label }}
+                        <small class="inline-meta">{{ record.attendance_type }}</small>
+                    </td>
+                    <td><span class="badge badge--{{ record.status_tone }}">{{ record.status }}</span></td>
+                </tr>
+                {% else %}
+                <tr>
+                    <td colspan="6" class="empty-row">No attendance records have been captured today.</td>
+                </tr>
+                {% endfor %}
+            </tbody>
+        </table>
+    </div>
+</section>
+{% endblock %}
+
+{% block extra_scripts %}
+<script>
+(() => {
+    const statNodes = {
+        present_today: document.querySelector('[data-stat="present_today"]'),
+        on_time: document.querySelector('[data-stat="on_time"]'),
+        late: document.querySelector('[data-stat="late"]'),
+        half_day: document.querySelector('[data-stat="half_day"]')
+    };
+    const tableBody = document.getElementById('todayAttendanceTable');
+    const lastUpdated = document.getElementById('lastUpdated');
+
+    function badgeTone(status) {
+        if (status === 'On Time') return 'success';
+        if (status === 'Late') return 'danger';
+        return 'info';
+    }
+
+    function createTextCell(text) {
+        const cell = document.createElement('td');
+        cell.textContent = text;
+        return cell;
+    }
+
+    function createAttendanceRow(record) {
+        const row = document.createElement('tr');
+        const nameCell = document.createElement('td');
+        const person = document.createElement('div');
+        person.className = 'table-person';
+
+        const avatar = document.createElement('span');
+        avatar.className = 'avatar avatar--tiny';
+        avatar.textContent = record.initials || 'GD';
+
+        const copy = document.createElement('div');
+        const name = document.createElement('strong');
+        name.textContent = record.name || 'Unknown Employee';
+        const department = document.createElement('small');
+        department.textContent = [record.department, record.work_mode].filter(Boolean).join(' | ') || '--';
+        copy.append(name, department);
+        person.append(avatar, copy);
+        nameCell.append(person);
+        row.append(nameCell);
+
+        const workModeCell = document.createElement('td');
+        const workModeBadge = document.createElement('span');
+        workModeBadge.className = `badge badge--${record.work_mode_tone || 'muted'}`;
+        workModeBadge.textContent = record.work_mode || '--';
+        workModeCell.append(workModeBadge);
+        row.append(workModeCell);
+
+        row.append(createTextCell(record.check_in_label || '--'));
+        row.append(createTextCell(record.check_out_label || '--'));
+
+        const hoursCell = document.createElement('td');
+        hoursCell.textContent = record.hours_label || '--';
+        const attendanceType = document.createElement('small');
+        attendanceType.className = 'inline-meta';
+        attendanceType.textContent = record.attendance_type || 'Pending';
+        hoursCell.append(attendanceType);
+        row.append(hoursCell);
+
+        const statusCell = document.createElement('td');
+        const badge = document.createElement('span');
+        badge.className = `badge badge--${badgeTone(record.status)}`;
+        badge.textContent = record.status || 'Pending';
+        statusCell.append(badge);
+        row.append(statusCell);
+
+        return row;
+    }
+
+    function renderRows(records) {
+        tableBody.replaceChildren();
+        if (!records.length) {
+            const row = document.createElement('tr');
+            const cell = document.createElement('td');
+            cell.colSpan = 6;
+            cell.className = 'empty-row';
+            cell.textContent = 'No attendance records have been captured today.';
+            row.append(cell);
+            tableBody.append(row);
+            return;
+        }
+
+        records.forEach((record) => {
+            tableBody.append(createAttendanceRow(record));
+        });
+    }
+
+    function animateValue(node, nextValue) {
+        const start = Number(node.textContent) || 0;
+        const startTime = performance.now();
+        const duration = 500;
+
+        function frame(now) {
+            const progress = Math.min((now - startTime) / duration, 1);
+            const current = Math.round(start + ((nextValue - start) * progress));
+            node.textContent = current;
+            if (progress < 1) {
+                requestAnimationFrame(frame);
+            }
+        }
+
+        requestAnimationFrame(frame);
+    }
+
+    async function refreshStats() {
+        try {
+            const response = await fetch('{{ url_for("api_today_stats") }}');
+            const payload = await response.json();
+
+            Object.entries(statNodes).forEach(([key, node]) => {
+                if (node) {
+                    animateValue(node, Number(payload[key] || 0));
+                }
+            });
+
+            renderRows(payload.records || []);
+            if (lastUpdated) {
+                lastUpdated.textContent = payload.last_updated;
+            }
+        } catch (error) {
+            console.error('Failed to refresh dashboard stats', error);
+        }
+    }
+
+    window.setInterval(refreshStats, 30000);
+})();
+</script>
+{% endblock %}

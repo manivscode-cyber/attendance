@@ -1,0 +1,152 @@
+{% extends 'base.html' %}
+{% from 'includes/stats-card.html' import stat_card %}
+
+{% block title %}GoDigital Attendance | Employee Workspace{% endblock %}
+{% block body_class %}page-workspace{% endblock %}
+
+{% block content %}
+{% set hero_kicker = 'Employee Workspace' %}
+{% set hero_title = 'Welcome, ' ~ session.get('emp_name', 'Employee') %}
+{% set hero_subtitle = "Review today's attendance status, move through check-in and break actions, and jump to your profile without leaving the workspace." %}
+{% set hero_meta = 'System time: ' ~ ist_now %}
+{% set hero_actions = [
+    {'href': url_for('attendance.face_attendance'), 'label': 'Open Attendance', 'class': 'btn-primary'},
+    {'href': url_for('attendance.history'), 'label': 'View History', 'class': ''}
+] %}
+{% set hero_pills = ['Department: ' ~ ((emp.department or session.get('department') or 'General')), 'Employee ID: ' ~ emp.emp_id, 'Monthly records: ' ~ monthly_days|string] %}
+{% set hero_summary_kicker = 'Today' %}
+{% set hero_summary_title = today_status %}
+{% set hero_summary_lines = [
+    'Attendance status: ' ~ today_attendance_status,
+    'Hours logged: ' ~ ('%.2f'|format(today_hours or 0)) ~ ' h'
+] %}
+{% include 'partials/hero-section.html' %}
+
+<section class="story-strip section-shell">
+    <article class="story-chip glass-card story-chip--accent">
+        <span class="kicker">Today</span>
+        <h3>{{ today_status }}</h3>
+        <p>Your current attendance state stays visible in one mobile-friendly workspace.</p>
+    </article>
+    <article class="story-chip glass-card">
+        <span class="kicker">Hours</span>
+        <h3>{{ '%.2f'|format(today_hours or 0) }} h</h3>
+        <p>Tracked hours for the current day, refreshed after each attendance action.</p>
+    </article>
+    <article class="story-chip glass-card story-chip--teal">
+        <span class="kicker">Next step</span>
+        <h3>{{ next_action_label }}</h3>
+        <p>Use the attendance page or the quick buttons below to continue the required workday sequence.</p>
+    </article>
+</section>
+
+<section class="stats-grid section-shell">
+    {{ stat_card('Today', today_status, 'accent', 'Current check-in / check-out state') }}
+    {{ stat_card('Status', today_attendance_status, 'success', 'Current daily attendance status') }}
+    {{ stat_card('Hours today', '%.2f'|format(today_hours or 0), 'warning', 'Tracked working time', ' h') }}
+    {{ stat_card('This month', monthly_days, 'accent', 'Attendance records captured this month') }}
+</section>
+
+<section class="glass section-shell">
+    <div class="section-head">
+        <div>
+            <h2>Attendance actions</h2>
+            <p>Follow the required order: check-in, break in, break out, then check-out.</p>
+        </div>
+        <span class="soft-badge">Next: {{ next_action_label }}</span>
+    </div>
+
+    <div class="table-actions">
+        <form method="POST" action="{{ url_for('attendance.checkin') }}">
+            <button type="submit" class="btn btn-primary" {% if not workflow.check_in_enabled %}disabled{% endif %}>Check-in</button>
+        </form>
+        <form method="POST" action="{{ url_for('attendance.breakin') }}">
+            <button type="submit" class="btn" {% if not workflow.break_in_enabled %}disabled{% endif %}>Break In</button>
+        </form>
+        <form method="POST" action="{{ url_for('attendance.breakout') }}">
+            <button type="submit" class="btn" {% if not workflow.break_out_enabled %}disabled{% endif %}>Break Out</button>
+        </form>
+        <form method="POST" action="{{ url_for('attendance.checkout') }}">
+            <button type="submit" class="btn btn-warning" {% if not workflow.check_out_enabled %}disabled{% endif %}>Check-out</button>
+        </form>
+    </div>
+</section>
+
+{% set quick_actions_title = 'Quick actions' %}
+{% set quick_actions_subtitle = 'Move between the most common employee workflows with a single tap.' %}
+{% set quick_actions = [
+        {
+            'href': url_for('attendance.face_attendance'),
+            'badge': 'Attendance',
+            'title': 'Check-in / break / check-out',
+            'description': 'Use the attendance page to move through the required sequence and keep today\'s record current.',
+            'metric': today_status,
+            'button_label': 'Open attendance',
+            'button_class': 'btn-primary'
+        },
+        {
+            'href': url_for('attendance.history'),
+            'badge': 'History',
+            'title': 'My attendance history',
+            'description': "Open your history page to review recent attendance records and total recorded hours.",
+            'metric': monthly_days ~ ' records this month',
+            'button_label': 'Open history'
+        }
+] %}
+{% if session.get('is_admin') %}
+    {% set quick_actions = quick_actions + [
+        {
+            'href': url_for('admin.admin_dashboard'),
+            'badge': 'Manager',
+            'title': 'Manager dashboard',
+            'description': 'You have manager access, so you can also review employees and reports from the admin workspace.',
+            'metric': 'Admin enabled',
+            'button_label': 'Open manager view'
+        }
+    ] %}
+{% endif %}
+{% include 'partials/quick-actions-grid.html' %}
+
+<section class="page-grid section-shell">
+    <article class="glass-card">
+        <div class="section-head">
+            <div>
+                <h2>Daily summary</h2>
+                <p>Your current attendance state for today.</p>
+            </div>
+        </div>
+        <dl class="detail-grid">
+            <div>
+                <dt>Employee ID</dt>
+                <dd>{{ emp.emp_id }}</dd>
+            </div>
+            <div>
+                <dt>Department</dt>
+                <dd>{{ emp.department or 'General' }}</dd>
+            </div>
+            <div>
+                <dt>Today</dt>
+                <dd>{{ today_status }}</dd>
+            </div>
+            <div>
+                <dt>Attendance</dt>
+                <dd>{{ today_attendance_status }}</dd>
+            </div>
+        </dl>
+    </article>
+
+    <article class="glass-card">
+        <div class="section-head">
+            <div>
+                <h2>What to do next</h2>
+                <p>Keep daily attendance simple and predictable.</p>
+            </div>
+        </div>
+        <ul class="feature-list">
+            <li>Start with check-in after login to open your attendance day.</li>
+            <li>Use break in and break out in sequence whenever you leave and return.</li>
+            <li>Finish with check-out, then log in again the next time you start work.</li>
+        </ul>
+    </article>
+</section>
+{% endblock %}

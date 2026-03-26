@@ -1,0 +1,38 @@
+{% set endpoint = request.endpoint or '' %}
+{% set manager_href = url_for('manager_page') if manager_session_active else url_for('manager_access_page', next=url_for('manager_page')) %}
+{% set manager_label = 'Manager' if manager_session_active else ('Unlock Manager' if manager_access_configured else 'Setup Manager') %}
+<header class="site-header">
+    <div class="site-shell header-shell">
+        <a href="{{ url_for('dashboard') }}" class="brand" aria-label="GoDigital home">
+            <img
+                src="{{ static_asset_url('img/godigital_logo.png') }}"
+                alt="GoDigital logo"
+                class="brand-logo"
+            >
+        </a>
+
+        <button
+            class="nav-toggle"
+            type="button"
+            aria-expanded="false"
+            aria-controls="primaryNav"
+            data-nav-toggle
+        >
+            Menu
+        </button>
+
+        <nav class="site-nav" id="primaryNav" aria-label="Primary" data-nav>
+            <a class="nav-link{% if endpoint == 'dashboard' %} active{% endif %}" href="{{ url_for('dashboard') }}">Home</a>
+            <a class="nav-link{% if endpoint == 'scan_page' %} active{% endif %}" href="{{ url_for('scan_page') }}">Scan</a>
+            <a class="nav-link{% if endpoint == 'enroll_page' %} active{% endif %}" href="{{ url_for('enroll_page') }}">Enroll</a>
+            <a class="nav-link{% if endpoint == 'history_page' %} active{% endif %}" href="{{ url_for('history_page') }}">History</a>
+            <a class="nav-link nav-link--accent{% if endpoint == 'manager_page' %} active{% endif %}" href="{{ manager_href }}">{{ manager_label }}</a>
+            {% if manager_session_active %}
+            <form method="post" action="{{ url_for('manager_logout') }}" class="nav-inline-form">
+                <input type="hidden" name="_csrf_token" value="{{ csrf_token() }}">
+                <button class="nav-link nav-link--button" type="submit">Lock Manager</button>
+            </form>
+            {% endif %}
+        </nav>
+    </div>
+</header>

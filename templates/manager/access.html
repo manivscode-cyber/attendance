@@ -1,0 +1,124 @@
+{% extends 'base.html' %}
+
+{% block title %}GoDigital | Manager Access{% endblock %}
+
+{% block content %}
+<section class="site-shell manager-access-shell manager-access-shell--single">
+    <article class="section-card manager-auth-card">
+        <div class="manager-auth-header">
+            <div class="manager-auth-badge" aria-hidden="true">
+                <svg viewBox="0 0 24 24" role="presentation">
+                    <path d="M12 2 4.5 5.2v5.5c0 5.3 3.2 10.2 7.5 11.8 4.3-1.6 7.5-6.5 7.5-11.8V5.2L12 2Zm0 2.2 5.3 2.3v4.2c0 4.4-2.5 8.5-5.3 9.9-2.8-1.4-5.3-5.5-5.3-9.9V6.5L12 4.2Zm-.9 4.1v4.1l-1.8-1.8-1.5 1.5 3.3 3.3 5-5-1.5-1.5-3.5 3.5V8.3h-2Z"></path>
+                </svg>
+            </div>
+            <div class="manager-auth-copy">
+                <p class="eyebrow">Manager Security</p>
+                {% if access_flow == 'setup' %}
+                <h1>Create Manager Password</h1>
+                <p class="hero-text">Create a secure password to protect manager controls.</p>
+                {% else %}
+                <h1>Unlock Manager Controls</h1>
+                <p class="hero-text">Enter your manager password to access secured features.</p>
+                {% endif %}
+            </div>
+        </div>
+
+        {% if access_flow == 'setup' %}
+        <form method="post" action="{{ url_for('manager_access_submit') }}" class="manager-auth-form">
+            <input type="hidden" name="_csrf_token" value="{{ csrf_token() }}">
+            <input type="hidden" name="next" value="{{ next_target }}">
+
+            <label class="manager-auth-field">
+                <span>New Password</span>
+                <div class="manager-auth-input-shell">
+                    <input id="setupPassword" class="manager-auth-input" type="password" name="password" autocomplete="new-password" minlength="10" maxlength="128" required placeholder="Create a strong password">
+                    <button class="manager-auth-toggle" type="button" data-password-toggle data-target="setupPassword" aria-label="Show password">
+                        <span class="manager-auth-toggle__icon manager-auth-toggle__icon--show" aria-hidden="true">
+                            <svg viewBox="0 0 24 24" role="presentation"><path d="M12 5c5.6 0 9.4 4.5 10.5 7-1.1 2.5-4.9 7-10.5 7S2.6 14.5 1.5 12C2.6 9.5 6.4 5 12 5Zm0 2C8.1 7 5 9.8 3.7 12 5 14.2 8.1 17 12 17s7-2.8 8.3-5C19 9.8 15.9 7 12 7Zm0 2.2A2.8 2.8 0 1 1 9.2 12 2.8 2.8 0 0 1 12 9.2Z"></path></svg>
+                        </span>
+                        <span class="manager-auth-toggle__icon manager-auth-toggle__icon--hide" aria-hidden="true">
+                            <svg viewBox="0 0 24 24" role="presentation"><path d="m3.3 2 18.7 18.7-1.4 1.4-3.1-3.1c-1.6.9-3.4 1.4-5.5 1.4-5.6 0-9.4-4.5-10.5-7 .6-1.3 1.8-3 3.6-4.5L1.9 3.4 3.3 2Zm5 8.4 1.6 1.6a2.7 2.7 0 0 0 3.1 3.1l1.6 1.6c-.8.4-1.7.6-2.6.6A5.2 5.2 0 0 1 6.8 12c0-.6.1-1.1.3-1.6Zm3.6-3.6c2.9 0 5.2 2.3 5.2 5.2 0 .9-.2 1.8-.6 2.6l-1.6-1.6a2.7 2.7 0 0 0-3.1-3.1l-1.6-1.6c.5-.2 1-.3 1.6-.3Zm.1-1.8c5.6 0 9.4 4.5 10.5 7-.5 1.2-1.6 2.7-3.1 4l-1.5-1.5c.9-.8 1.6-1.7 2.1-2.5-1.3-2.2-4.4-5-8.3-5-.8 0-1.6.1-2.3.3L8 5.8c1.2-.5 2.5-.8 4-.8Z"></path></svg>
+                        </span>
+                    </button>
+                </div>
+            </label>
+
+            <label class="manager-auth-field">
+                <span>Confirm Password</span>
+                <div class="manager-auth-input-shell">
+                    <input id="setupConfirmPassword" class="manager-auth-input" type="password" name="confirm_password" autocomplete="new-password" minlength="10" maxlength="128" required placeholder="Confirm the password">
+                    <button class="manager-auth-toggle" type="button" data-password-toggle data-target="setupConfirmPassword" aria-label="Show password">
+                        <span class="manager-auth-toggle__icon manager-auth-toggle__icon--show" aria-hidden="true">
+                            <svg viewBox="0 0 24 24" role="presentation"><path d="M12 5c5.6 0 9.4 4.5 10.5 7-1.1 2.5-4.9 7-10.5 7S2.6 14.5 1.5 12C2.6 9.5 6.4 5 12 5Zm0 2C8.1 7 5 9.8 3.7 12 5 14.2 8.1 17 12 17s7-2.8 8.3-5C19 9.8 15.9 7 12 7Zm0 2.2A2.8 2.8 0 1 1 9.2 12 2.8 2.8 0 0 1 12 9.2Z"></path></svg>
+                        </span>
+                        <span class="manager-auth-toggle__icon manager-auth-toggle__icon--hide" aria-hidden="true">
+                            <svg viewBox="0 0 24 24" role="presentation"><path d="m3.3 2 18.7 18.7-1.4 1.4-3.1-3.1c-1.6.9-3.4 1.4-5.5 1.4-5.6 0-9.4-4.5-10.5-7 .6-1.3 1.8-3 3.6-4.5L1.9 3.4 3.3 2Zm5 8.4 1.6 1.6a2.7 2.7 0 0 0 3.1 3.1l1.6 1.6c-.8.4-1.7.6-2.6.6A5.2 5.2 0 0 1 6.8 12c0-.6.1-1.1.3-1.6Zm3.6-3.6c2.9 0 5.2 2.3 5.2 5.2 0 .9-.2 1.8-.6 2.6l-1.6-1.6a2.7 2.7 0 0 0-3.1-3.1l-1.6-1.6c.5-.2 1-.3 1.6-.3Zm.1-1.8c5.6 0 9.4 4.5 10.5 7-.5 1.2-1.6 2.7-3.1 4l-1.5-1.5c.9-.8 1.6-1.7 2.1-2.5-1.3-2.2-4.4-5-8.3-5-.8 0-1.6.1-2.3.3L8 5.8c1.2-.5 2.5-.8 4-.8Z"></path></svg>
+                        </span>
+                    </button>
+                </div>
+            </label>
+
+            <button class="button manager-auth-submit" type="submit">Create Password</button>
+        </form>
+        {% else %}
+        <form method="post" action="{{ url_for('manager_access_submit') }}" class="manager-auth-form">
+            <input type="hidden" name="_csrf_token" value="{{ csrf_token() }}">
+            <input type="hidden" name="next" value="{{ next_target }}">
+
+            <label class="manager-auth-field">
+                <span>Password</span>
+                <div class="manager-auth-input-shell">
+                    <input id="managerPassword" class="manager-auth-input" type="password" name="password" autocomplete="current-password" minlength="10" maxlength="128" required placeholder="Enter your manager password">
+                    <button class="manager-auth-toggle" type="button" data-password-toggle data-target="managerPassword" aria-label="Show password">
+                        <span class="manager-auth-toggle__icon manager-auth-toggle__icon--show" aria-hidden="true">
+                            <svg viewBox="0 0 24 24" role="presentation"><path d="M12 5c5.6 0 9.4 4.5 10.5 7-1.1 2.5-4.9 7-10.5 7S2.6 14.5 1.5 12C2.6 9.5 6.4 5 12 5Zm0 2C8.1 7 5 9.8 3.7 12 5 14.2 8.1 17 12 17s7-2.8 8.3-5C19 9.8 15.9 7 12 7Zm0 2.2A2.8 2.8 0 1 1 9.2 12 2.8 2.8 0 0 1 12 9.2Z"></path></svg>
+                        </span>
+                        <span class="manager-auth-toggle__icon manager-auth-toggle__icon--hide" aria-hidden="true">
+                            <svg viewBox="0 0 24 24" role="presentation"><path d="m3.3 2 18.7 18.7-1.4 1.4-3.1-3.1c-1.6.9-3.4 1.4-5.5 1.4-5.6 0-9.4-4.5-10.5-7 .6-1.3 1.8-3 3.6-4.5L1.9 3.4 3.3 2Zm5 8.4 1.6 1.6a2.7 2.7 0 0 0 3.1 3.1l1.6 1.6c-.8.4-1.7.6-2.6.6A5.2 5.2 0 0 1 6.8 12c0-.6.1-1.1.3-1.6Zm3.6-3.6c2.9 0 5.2 2.3 5.2 5.2 0 .9-.2 1.8-.6 2.6l-1.6-1.6a2.7 2.7 0 0 0-3.1-3.1l-1.6-1.6c.5-.2 1-.3 1.6-.3Zm.1-1.8c5.6 0 9.4 4.5 10.5 7-.5 1.2-1.6 2.7-3.1 4l-1.5-1.5c.9-.8 1.6-1.7 2.1-2.5-1.3-2.2-4.4-5-8.3-5-.8 0-1.6.1-2.3.3L8 5.8c1.2-.5 2.5-.8 4-.8Z"></path></svg>
+                        </span>
+                    </button>
+                </div>
+            </label>
+
+            <button class="button manager-auth-submit" type="submit">Unlock Manager</button>
+        </form>
+        {% endif %}
+    </article>
+</section>
+{% endblock %}
+
+{% block extra_scripts %}
+<script>
+(() => {
+    const toggleButtons = document.querySelectorAll('[data-password-toggle]');
+    toggleButtons.forEach((button) => {
+        const input = document.getElementById(button.dataset.target);
+        if (!input) {
+            return;
+        }
+
+        button.addEventListener('click', () => {
+            const isPassword = input.type === 'password';
+            input.type = isPassword ? 'text' : 'password';
+            button.classList.toggle('is-visible', isPassword);
+            button.setAttribute('aria-label', isPassword ? 'Hide password' : 'Show password');
+        });
+    });
+
+    const setupPassword = document.getElementById('setupPassword');
+    const setupConfirmPassword = document.getElementById('setupConfirmPassword');
+    if (setupPassword && setupConfirmPassword) {
+        const syncPasswordMatch = () => {
+            if (setupConfirmPassword.value && setupPassword.value !== setupConfirmPassword.value) {
+                setupConfirmPassword.setCustomValidity('Manager passwords did not match.');
+            } else {
+                setupConfirmPassword.setCustomValidity('');
+            }
+        };
+
+        setupPassword.addEventListener('input', syncPasswordMatch);
+        setupConfirmPassword.addEventListener('input', syncPasswordMatch);
+    }
+})();
+</script>
+{% endblock %}

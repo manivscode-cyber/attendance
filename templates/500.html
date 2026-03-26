@@ -1,0 +1,12 @@
+{% extends 'base.html' %}
+
+{% block title %}GoDigital | Error{% endblock %}
+
+{% block content %}
+<section class="site-shell section-card state-card">
+    <p class="eyebrow">500</p>
+    <h1>Something went wrong</h1>
+    <p class="hero-text">The attendance service hit an unexpected error. Try again in a moment.</p>
+    <a class="button" href="{{ url_for('dashboard') }}">Back to Dashboard</a>
+</section>
+{% endblock %}

@@ -1,0 +1,284 @@
+{% extends 'base.html' %}
+
+{% block title %}GoDigital | Enroll{% endblock %}
+
+{% block content %}
+<section class="site-shell">
+    <div class="stepper glass-card">
+        <div class="step is-active"><span>1</span><strong>Details</strong></div>
+        <div class="step is-active"><span>2</span><strong>Capture</strong></div>
+        <div class="step"><span>3</span><strong>Confirm</strong></div>
+    </div>
+</section>
+
+<section class="site-shell page-grid">
+    <article class="glass-card enroll-card">
+        <div class="section-head">
+            <div>
+                <p class="eyebrow">Employee Enrollment</p>
+                <h1>Register a new face profile</h1>
+            </div>
+        </div>
+
+        <form id="enrollForm" class="form-grid enroll-form">
+            <label>
+                <span>Employee Name</span>
+                <input type="text" name="name" placeholder="Anita Sharma" required>
+            </label>
+            <label>
+                <span>Phone Number</span>
+                <input
+                    type="tel"
+                    name="phone"
+                    placeholder="9876543210"
+                    inputmode="numeric"
+                    pattern="[0-9]{10}"
+                    maxlength="10"
+                    required
+                >
+            </label>
+            <label>
+                <div class="enroll-select-shell">
+                    <span class="enroll-select-shell__label">Department</span>
+                    <select name="department" required class="enroll-select-control enroll-select-control--stacked" aria-label="Department">
+                        <optgroup label="Department">
+                            {% for department in department_options %}
+                            <option value="{{ department }}" {% if department == 'IT' %}selected{% endif %}>{{ department }}</option>
+                            {% endfor %}
+                        </optgroup>
+                    </select>
+                </div>
+            </label>
+            <label>
+                <div class="enroll-select-shell">
+                    <span class="enroll-select-shell__label">Work Mode</span>
+                    <select name="work_mode" required class="enroll-select-control enroll-select-control--stacked" aria-label="Work Mode">
+                        <optgroup label="Work Mode">
+                            {% for work_mode in work_mode_options %}
+                            <option value="{{ work_mode }}" {% if work_mode == 'Onsite' %}selected{% endif %}>{{ work_mode }}</option>
+                            {% endfor %}
+                        </optgroup>
+                    </select>
+                </div>
+            </label>
+        </form>
+
+        <div class="camera-stage camera-stage--rect">
+            <video id="enrollVideo" autoplay playsinline muted></video>
+            <canvas id="enrollCanvas" hidden></canvas>
+            <div class="camera-overlay-text" id="enrollState">Camera idle</div>
+        </div>
+
+        <div class="camera-actions">
+            <button class="button button--ghost" id="enrollStartButton" type="button">Start Camera</button>
+            <button class="button" id="captureEnrollButton" type="button">Capture Face</button>
+            <button class="button button--gold" id="saveEnrollButton" type="button">Confirm Enrollment</button>
+        </div>
+    </article>
+
+    <aside class="glass-card result-card">
+        <p class="eyebrow">Confirmation</p>
+        <div class="result-person">
+            <img id="enrollPreviewImage" alt="Captured preview" hidden>
+            <span class="avatar avatar--large" id="enrollPreviewInitials">GD</span>
+            <div>
+                <h2 id="enrollResultTitle">Awaiting capture</h2>
+                <p class="support-copy" id="enrollResultSubtext">Capture a face and confirm the form to enroll the employee.</p>
+            </div>
+        </div>
+        <div class="result-message" id="enrollMessage">No capture yet.</div>
+        <div class="detail-list">
+            <div>
+                <span>Generated ID</span>
+                <strong id="enrollEmployeeCode">--</strong>
+            </div>
+            <div>
+                <span>Department</span>
+                <strong id="enrollDepartment">General</strong>
+            </div>
+            <div>
+                <span>Work Mode</span>
+                <strong id="enrollWorkMode">Onsite</strong>
+            </div>
+        </div>
+    </aside>
+</section>
+{% endblock %}
+
+{% block extra_scripts %}
+<script>
+(() => {
+    const video = document.getElementById('enrollVideo');
+    const canvas = document.getElementById('enrollCanvas');
+    const form = document.getElementById('enrollForm');
+    const stateText = document.getElementById('enrollState');
+    const startButton = document.getElementById('enrollStartButton');
+    const captureButton = document.getElementById('captureEnrollButton');
+    const saveButton = document.getElementById('saveEnrollButton');
+    const previewImage = document.getElementById('enrollPreviewImage');
+    const previewInitials = document.getElementById('enrollPreviewInitials');
+    const resultTitle = document.getElementById('enrollResultTitle');
+    const resultSubtext = document.getElementById('enrollResultSubtext');
+    const messageNode = document.getElementById('enrollMessage');
+    const employeeCodeNode = document.getElementById('enrollEmployeeCode');
+    const departmentNode = document.getElementById('enrollDepartment');
+    const workModeNode = document.getElementById('enrollWorkMode');
+    const phoneInput = form.querySelector('input[name="phone"]');
+    const csrfToken = document.querySelector('meta[name="csrf-token"]')?.content || '';
+
+    let stream = null;
+    let capturedImageData = null;
+
+    async function startCamera() {
+        try {
+            if (stream) {
+                stream.getTracks().forEach((track) => track.stop());
+            }
+            stream = await navigator.mediaDevices.getUserMedia({
+                video: { facingMode: 'user', width: { ideal: 960 }, height: { ideal: 720 } },
+                audio: false
+            });
+            video.srcObject = stream;
+            await video.play();
+            stateText.textContent = 'Camera ready';
+            messageNode.textContent = 'Camera started. Capture one clear face to continue.';
+        } catch (error) {
+            stateText.textContent = 'Camera unavailable';
+            messageNode.textContent = 'Allow webcam access and try again.';
+        }
+    }
+
+    function captureFrame() {
+        if (!video.videoWidth || !video.videoHeight) {
+            throw new Error('Camera is not ready yet.');
+        }
+
+        const sourceWidth = video.videoWidth;
+        const sourceHeight = video.videoHeight;
+        const cropSize = Math.round(Math.min(sourceWidth, sourceHeight) * 0.82);
+        const cropX = Math.max(0, Math.round((sourceWidth - cropSize) / 2));
+        const cropY = Math.max(0, Math.round((sourceHeight - cropSize) / 2));
+
+        canvas.width = cropSize;
+        canvas.height = cropSize;
+        const context = canvas.getContext('2d');
+        context.drawImage(
+            video,
+            cropX,
+            cropY,
+            cropSize,
+            cropSize,
+            0,
+            0,
+            canvas.width,
+            canvas.height
+        );
+        return canvas.toDataURL('image/jpeg', 0.9);
+    }
+
+    function updatePreviewFromForm() {
+        const formData = new FormData(form);
+        const name = formData.get('name') || 'Employee';
+        const department = formData.get('department') || 'General';
+        const workMode = formData.get('work_mode') || 'Onsite';
+        const parts = String(name).trim().split(/\s+/).filter(Boolean);
+        previewInitials.textContent = parts.length > 1
+            ? `${parts[0][0]}${parts[parts.length - 1][0]}`.toUpperCase()
+            : String(name).slice(0, 2).toUpperCase();
+        departmentNode.textContent = department;
+        workModeNode.textContent = workMode;
+    }
+
+    async function saveEnrollment() {
+        const formData = new FormData(form);
+        if (!formData.get('name') || !formData.get('phone')) {
+            messageNode.textContent = 'Enter employee name and phone number first.';
+            return;
+        }
+        if (!/^\d{10}$/.test(String(formData.get('phone') || ''))) {
+            messageNode.textContent = 'Phone number must contain exactly 10 digits.';
+            return;
+        }
+        if (!capturedImageData) {
+            messageNode.textContent = 'Capture a face before confirming enrollment.';
+            return;
+        }
+
+        saveButton.disabled = true;
+        messageNode.textContent = 'Saving employee profile...';
+
+        try {
+            const response = await fetch('{{ url_for("api_enroll") }}', {
+                method: 'POST',
+                headers: {
+                    'Content-Type': 'application/json',
+                    'X-CSRF-Token': csrfToken
+                },
+                body: JSON.stringify({
+                    name: formData.get('name'),
+                    phone: formData.get('phone'),
+                    department: formData.get('department'),
+                    work_mode: formData.get('work_mode'),
+                    image_data: capturedImageData
+                })
+            });
+            const payload = await response.json();
+
+            if (response.ok && payload.success) {
+                resultTitle.textContent = payload.employee.name;
+                resultSubtext.textContent = payload.message;
+                employeeCodeNode.textContent = payload.employee.employee_id;
+                departmentNode.textContent = payload.employee.department;
+                workModeNode.textContent = payload.employee.work_mode;
+                messageNode.textContent = `${payload.message} Registered faces: ${payload.registered_faces}. You can open Scan now.`;
+                if (payload.employee.photo_url) {
+                    previewImage.src = payload.employee.photo_url;
+                    previewImage.hidden = false;
+                    previewInitials.hidden = true;
+                }
+            } else {
+                messageNode.textContent = payload.message || 'Enrollment failed.';
+            }
+        } catch (error) {
+            messageNode.textContent = error.message || 'Enrollment failed.';
+        } finally {
+            saveButton.disabled = false;
+        }
+    }
+
+    startButton.addEventListener('click', startCamera);
+    captureButton.addEventListener('click', async () => {
+        if (!video.srcObject) {
+            await startCamera();
+        }
+        try {
+            capturedImageData = captureFrame();
+            updatePreviewFromForm();
+            previewImage.src = capturedImageData;
+            previewImage.hidden = false;
+            previewInitials.hidden = true;
+            resultTitle.textContent = 'Face captured';
+            resultSubtext.textContent = 'Review the details and confirm enrollment.';
+            messageNode.textContent = 'Capture successful. Ready to confirm.';
+        } catch (error) {
+            messageNode.textContent = error.message || 'Capture failed.';
+        }
+    });
+
+    saveButton.addEventListener('click', saveEnrollment);
+    form.addEventListener('input', updatePreviewFromForm);
+    phoneInput.addEventListener('input', () => {
+        phoneInput.value = phoneInput.value.replace(/\D/g, '').slice(0, 10);
+    });
+    window.addEventListener('load', async () => {
+        updatePreviewFromForm();
+        await startCamera();
+    });
+    window.addEventListener('beforeunload', () => {
+        if (stream) {
+            stream.getTracks().forEach((track) => track.stop());
+        }
+    });
+})();
+</script>
+{% endblock %}

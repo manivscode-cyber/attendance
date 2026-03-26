@@ -1,0 +1,87 @@
+<footer class="site-footer">
+    <div class="site-shell footer-shell footer-shell--pro">
+        <div class="footer-suite" role="contentinfo">
+            <div class="footer-band footer-band--minimal">
+                <a
+                    href="https://godigital.ind.in/"
+                    class="footer-brand-link footer-brand-link--minimal"
+                    target="_blank"
+                    rel="noopener noreferrer"
+                    aria-label="Open GoDigital website"
+                >
+                    <img
+                        src="{{ static_asset_url('img/godigital_logo.png') }}"
+                        alt="GoDigital logo"
+                        class="footer-logo"
+                    >
+                </a>
+                <div class="footer-socials" aria-label="GoDigital social links">
+                    <a
+                        href="https://www.facebook.com/people/Go-Digital/61554297495308/"
+                        class="footer-social"
+                        target="_blank"
+                        rel="noopener noreferrer"
+                        aria-label="Open GoDigital Facebook"
+                    >
+                        <svg viewBox="0 0 24 24" aria-hidden="true">
+                            <path d="M13.5 21v-7h2.3l.4-3h-2.7V9.1c0-.9.3-1.6 1.7-1.6H16V4.8c-.5-.1-1.3-.2-2.3-.2-2.3 0-3.8 1.4-3.8 4v2.3H7.5v3h2.4v7h3.6z"></path>
+                        </svg>
+                    </a>
+                    <a
+                        href="https://www.instagram.com/p/DIOeTvhNEHp/"
+                        class="footer-social"
+                        target="_blank"
+                        rel="noopener noreferrer"
+                        aria-label="Open GoDigital Instagram"
+                    >
+                        <svg viewBox="0 0 24 24" aria-hidden="true">
+                            <path d="M7.8 3h8.4A4.8 4.8 0 0 1 21 7.8v8.4a4.8 4.8 0 0 1-4.8 4.8H7.8A4.8 4.8 0 0 1 3 16.2V7.8A4.8 4.8 0 0 1 7.8 3zm0 1.8A3 3 0 0 0 4.8 7.8v8.4a3 3 0 0 0 3 3h8.4a3 3 0 0 0 3-3V7.8a3 3 0 0 0-3-3H7.8zm8.9 1.3a1.1 1.1 0 1 1 0 2.2 1.1 1.1 0 0 1 0-2.2zM12 7.6A4.4 4.4 0 1 1 7.6 12 4.4 4.4 0 0 1 12 7.6zm0 1.8A2.6 2.6 0 1 0 14.6 12 2.6 2.6 0 0 0 12 9.4z"></path>
+                        </svg>
+                    </a>
+                    <a
+                        href="https://www.youtube.com/@godigital5039"
+                        class="footer-social"
+                        target="_blank"
+                        rel="noopener noreferrer"
+                        aria-label="Open GoDigital YouTube"
+                    >
+                        <svg viewBox="0 0 24 24" aria-hidden="true">
+                            <path d="M21.1 7.2a2.9 2.9 0 0 0-2-2C17.3 4.7 12 4.7 12 4.7s-5.3 0-7.1.5a2.9 2.9 0 0 0-2 2A30 30 0 0 0 2.4 12a30 30 0 0 0 .5 4.8 2.9 2.9 0 0 0 2 2c1.8.5 7.1.5 7.1.5s5.3 0 7.1-.5a2.9 2.9 0 0 0 2-2 30 30 0 0 0 .5-4.8 30 30 0 0 0-.5-4.8zM10.2 15.3V8.7l5.5 3.3-5.5 3.3z"></path>
+                        </svg>
+                    </a>
+                </div>
+            </div>
+            <div class="footer-grid">
+                <section class="footer-column">
+                    <h3>About Us</h3>
+                    <p>GoDigital helps businesses grow through software delivery, digital marketing, and practical online strategy.</p>
+                    <div class="footer-contact-list">
+                        <a href="tel:+916381595918">+91 63815 95918</a>
+                        <a href="tel:+919444943094">+91 94449 43094</a>
+                        <a href="mailto:godigitalmadras@gmail.com">godigitalmadras@gmail.com</a>
+                        <span>No:14, Udaya Suriyan Nagar, Guduvanchery, 603202</span>
+                    </div>
+                </section>
+                <section class="footer-column">
+                    <h3>Services</h3>
+                    <div class="footer-link-list">
+                        <span>Custom Software Development</span>
+                        <span>Digital Marketing Services</span>
+                        <span>Google Ads</span>
+                        <span>Facebook Ads</span>
+                    </div>
+                </section>
+                <section class="footer-column">
+                    <h3>Quick Links</h3>
+                    <div class="footer-link-list">
+                        <a href="{{ url_for('dashboard') }}">Home</a>
+                        <a href="{{ url_for('scan_page') }}">Scan</a>
+                        <a href="{{ url_for('enroll_page') }}">Enroll</a>
+                        <a href="{{ url_for('history_page') }}">History</a>
+                        <a href="{{ url_for('manager_page') }}">Manager</a>
+                    </div>
+                </section>
+            </div>
+        </div>
+    </div>
+</footer>

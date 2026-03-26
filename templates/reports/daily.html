@@ -1,0 +1,102 @@
+{% extends 'base.html' %}
+{% from 'includes/stats-card.html' import stat_card %}
+
+{% block title %}GoDigital Attendance | Daily Report{% endblock %}
+
+{% block content %}
+{% set daily_label = report_date.isoformat() if report_date else 'today' %}
+{% set hero_kicker = 'Daily Attendance Report' %}
+{% set hero_title = 'Daily attendance status for ' ~ daily_label %}
+{% set hero_subtitle = 'Review attendance outcomes, punctuality, and recorded work hours for a single business day.' %}
+{% set hero_actions = [
+    {'href': url_for('admin.company_today'), 'label': 'Company Today', 'class': 'btn-primary'},
+    {'href': '/admin/export/daily/' ~ daily_label, 'label': 'Export CSV', 'class': ''}
+] %}
+{% set hero_summary_kicker = 'Report snapshot' %}
+{% set hero_summary_title = (total_present or 0) ~ ' present' %}
+{% set hero_summary_lines = [
+    (total_half_day or 0) ~ ' half day',
+    (total_absent or 0) ~ ' absent'
+] %}
+{% include 'partials/hero-section.html' %}
+
+<section class="stats-grid section-shell">
+    {{ stat_card('Present', total_present or 0, 'success', 'Employees with attendance marked') }}
+    {{ stat_card('Half Day', total_half_day or 0, 'warning', 'Employees with four to six work hours for the selected date') }}
+    {{ stat_card('Absent', total_absent or 0, 'danger', 'Employees not marked present') }}
+</section>
+
+<section class="glass section-shell">
+    <div class="section-head">
+        <div>
+            <h2>Daily filters</h2>
+            <p>Switch the report date and export the results when needed.</p>
+        </div>
+    </div>
+
+    <form method="GET" action="{{ url_for('admin.daily_report') }}" class="toolbar">
+        <label class="form-field">
+            <span>Report date</span>
+            <input type="date" name="date" value="{{ report_date.isoformat() if report_date else '' }}">
+        </label>
+        <button type="submit" class="btn btn-primary">Load report</button>
+        <a href="/admin/export/daily/{{ daily_label }}" class="btn">Export CSV</a>
+    </form>
+</section>
+
+<section class="glass section-shell">
+    <div class="section-head">
+        <div>
+            <h2>Attendance records</h2>
+            <p>Attendance rows for the selected day.</p>
+        </div>
+    </div>
+
+    {% if records %}
+    <div class="table-wrap">
+        <table class="modern-table">
+            <thead>
+                <tr>
+                    <th>Employee ID</th>
+                    <th>Name</th>
+                    <th>Department</th>
+                    <th>Attendance type</th>
+                    <th>Status</th>
+                    <th>Check-in</th>
+                    <th>Check-out</th>
+                    <th>Hours</th>
+                </tr>
+            </thead>
+            <tbody>
+                {% for r in records %}
+                {% set employee = r.employee|default(None) %}
+                {% set emp_id = r.emp_id|default(employee.emp_id if employee else '-') %}
+                {% set emp_name = r.emp_name|default(employee.name if employee else '-') %}
+                {% set department = r.department|default(employee.department if employee else '-') %}
+                {% set attendance_type = r.attendance_type|default('-') %}
+                {% set record_status = r.status|default('Pending') %}
+                {% set total_hours_value = r.effective_total_hours|default(r.total_hours|default(0)) %}
+                <tr>
+                    <td class="table-strong">{{ emp_id }}</td>
+                    <td>{{ emp_name }}</td>
+                    <td>{{ department or '-' }}</td>
+                    <td>{{ attendance_type or '-' }}</td>
+                    <td>
+                        {% set badge_class = r.badge_class|default('absent') %}
+                        <span class="status-badge {{ badge_class }}">
+                            {{ record_status }}
+                        </span>
+                    </td>
+                    <td>{{ r.check_in or '-' }}</td>
+                    <td>{{ r.check_out or '-' }}</td>
+                    <td>{{ '%.2f'|format(total_hours_value or 0) }} h</td>
+                </tr>
+                {% endfor %}
+            </tbody>
+        </table>
+    </div>
+    {% else %}
+    <div class="empty-state">No attendance records found for this date.</div>
+    {% endif %}
+</section>
+{% endblock %}

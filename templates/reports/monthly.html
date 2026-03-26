@@ -1,0 +1,128 @@
+{% extends 'base.html' %}
+{% from 'includes/stats-card.html' import stat_card %}
+
+{% block title %}GoDigital Attendance | Monthly Report{% endblock %}
+
+{% block content %}
+{% set month_names = ['January', 'February', 'March', 'April', 'May', 'June', 'July', 'August', 'September', 'October', 'November', 'December'] %}
+{% set report_month_name = month_names[month - 1] %}
+{% set hero_kicker = 'Monthly Attendance Report' %}
+{% set hero_title = report_month_name ~ ' ' ~ year %}
+{% set hero_subtitle = 'Review monthly attendance coverage, total hours, punctuality, and employee-level attendance percentages.' %}
+{% set hero_actions = [
+    {'href': url_for('admin.daily_report'), 'label': 'Daily Report', 'class': ''},
+    {'href': '/admin/export/monthly/' ~ year ~ '/' ~ month, 'label': 'Export CSV', 'class': 'btn-primary'}
+] %}
+{% set hero_summary_kicker = 'Month summary' %}
+{% set hero_summary_title = (employee_reports|length) ~ ' employees' %}
+{% set hero_summary_lines = [
+    (total_present_days or 0) ~ ' present days',
+    (total_half_day_days or 0) ~ ' half day',
+    ('%.2f'|format(total_month_hours or 0)) ~ ' total hours'
+] %}
+{% include 'partials/hero-section.html' %}
+
+<section class="stats-grid section-shell">
+    {{ stat_card('Employees', employee_reports|length, 'accent', 'Employees with monthly attendance data') }}
+    {{ stat_card('Present days', total_present_days or 0, 'success', 'Total present attendance days') }}
+    {{ stat_card('Half Day', total_half_day_days or 0, 'warning', 'Half-day attendance records this month') }}
+    {{ stat_card('Hours', '%.2f'|format(total_month_hours or 0), 'accent', 'Automatically calculated hours for this month', ' h') }}
+</section>
+
+<section class="glass section-shell">
+    <div class="section-head">
+        <div>
+            <h2>Monthly filters</h2>
+            <p>Switch the month from the calendar picker and export the aggregated attendance report.</p>
+        </div>
+    </div>
+
+    <form method="GET" action="{{ url_for('admin.monthly_report') }}" class="toolbar">
+        <label class="form-field">
+            <span>Report month</span>
+            <input type="month" name="month_ref" value="{{ month_picker_value }}">
+        </label>
+        <button type="submit" class="btn btn-primary">Load report</button>
+        <a href="{{ prev_month_url }}" class="btn">Previous month</a>
+        <a href="{{ next_month_url }}" class="btn">Next month</a>
+        <a href="/admin/export/monthly/{{ year }}/{{ month }}" class="btn">Export monthly report</a>
+    </form>
+</section>
+
+<section class="glass section-shell">
+    <div class="section-head">
+        <div>
+            <h2>Monthly calendar</h2>
+            <p>Every day updates automatically from attendance timings and links to the detailed daily report.</p>
+        </div>
+        <span class="soft-badge">{{ report_month_name }} {{ year }}</span>
+    </div>
+
+    <div class="report-calendar">
+        {% for day_name in ['Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat', 'Sun'] %}
+        <div class="report-calendar__weekday">{{ day_name }}</div>
+        {% endfor %}
+
+        {% for week in calendar_weeks %}
+            {% for day in week %}
+            <a href="{{ url_for('admin.daily_report', date=day.iso_date) }}" class="report-calendar__day{% if not day.in_month %} is-muted{% endif %}{% if day.is_today %} is-today{% endif %}">
+                <div class="report-calendar__day-top">
+                    <strong>{{ day.day_number }}</strong>
+                    <span>{{ day.attendance_rate }}%</span>
+                </div>
+                <div class="report-calendar__metrics">
+                    <span>Present {{ day.present_count }}</span>
+                    <span>Half Day {{ day.half_day_count }}</span>
+                    <span>Absent {{ day.absent_count }}</span>
+                    <span>{{ '%.2f'|format(day.total_hours or 0) }} h</span>
+                </div>
+            </a>
+            {% endfor %}
+        {% endfor %}
+    </div>
+</section>
+
+<section class="glass section-shell">
+    <div class="section-head">
+        <div>
+            <h2>Employee-wise monthly summary</h2>
+            <p>Attendance, punctuality, and total-hour data by employee.</p>
+        </div>
+    </div>
+
+    {% if employee_reports %}
+    <div class="table-wrap">
+        <table class="modern-table">
+            <thead>
+                <tr>
+                    <th>Employee ID</th>
+                    <th>Name</th>
+                    <th>Department</th>
+                    <th>Total days</th>
+                    <th>Present</th>
+                    <th>Half Day</th>
+                    <th>Total hours</th>
+                    <th>Attendance %</th>
+                </tr>
+            </thead>
+            <tbody>
+                {% for emp_id, report in employee_reports.items() %}
+                <tr>
+                    <td class="table-strong">{{ emp_id }}</td>
+                    <td>{{ report.emp_name }}</td>
+                    <td>{{ report.department or '-' }}</td>
+                    <td>{{ report.total_days }}</td>
+                    <td>{{ report.present_days }}</td>
+                    <td>{{ report.half_day_days }}</td>
+                    <td>{{ '%.2f'|format(report.total_hours or 0) }} h</td>
+                    <td>{{ '%.1f'|format(report.attendance_pct|default(0)) }}%</td>
+                </tr>
+                {% endfor %}
+            </tbody>
+        </table>
+    </div>
+    {% else %}
+    <div class="empty-state">No data is available for this month.</div>
+    {% endif %}
+</section>
+{% endblock %}

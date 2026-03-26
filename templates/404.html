@@ -1,0 +1,12 @@
+{% extends 'base.html' %}
+
+{% block title %}GoDigital | Not Found{% endblock %}
+
+{% block content %}
+<section class="site-shell section-card state-card">
+    <p class="eyebrow">404</p>
+    <h1>Page not found</h1>
+    <p class="hero-text">The page you requested does not exist in the GoDigital attendance workspace.</p>
+    <a class="button" href="{{ url_for('dashboard') }}">Back to Dashboard</a>
+</section>
+{% endblock %}

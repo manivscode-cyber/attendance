@@ -1,0 +1,71 @@
+{% extends 'base.html' %}
+
+{% block title %}GoDigital Attendance | Login{% endblock %}
+{% block body_class %}page-login{% endblock %}
+
+{% block content %}
+<section class="auth-shell">
+    <article class="auth-card glass auth-card--split">
+        <div class="auth-stage">
+            <span class="kicker">Pocket Attendance</span>
+            <h1 class="page-title">Clock in with calm, not clutter.</h1>
+            <p class="page-subtitle">
+                Your mobile workspace opens with your mail ID and name.
+                Managers can create employees from the admin dashboard without
+                changing the clean mobile-first login flow.
+            </p>
+
+            <div class="auth-mini-grid">
+                <article class="auth-mini-card">
+                    <small>Flow</small>
+                    <strong>Mail + name sign-in</strong>
+                    <span>Fast enough for everyday arrival and exit routines.</span>
+                </article>
+                <article class="auth-mini-card">
+                    <small>Ready</small>
+                    <strong>Attendance next</strong>
+                    <span>Open the attendance page after sign-in and move through the full workday flow.</span>
+                </article>
+            </div>
+
+            <ul class="auth-point-list">
+                <li>Large touch-friendly inputs designed for phones.</li>
+                <li>Instant route to attendance, dashboard, and personal status.</li>
+                <li>Clean visual hierarchy for repeat check-ins and manager-created accounts.</li>
+            </ul>
+        </div>
+
+        <div class="auth-form-card">
+            <div class="auth-copy">
+                <span class="kicker">Secure Access</span>
+                <h2>Employee login</h2>
+                <p class="page-subtitle">
+                    Sign in with your mail ID and name to open your attendance workspace.
+                </p>
+            </div>
+
+            <form method="POST" action="{{ url_for('auth.login') }}" class="stack-lg">
+                <label class="form-field">
+                    <span>Mail ID</span>
+                    <input id="email" type="text" name="email" required placeholder="name@company.com" autocomplete="username">
+                </label>
+
+                <label class="form-field">
+                    <span>Name</span>
+                    <input id="name" type="text" name="name" required placeholder="Enter your name" autocomplete="name">
+                </label>
+
+                <button type="submit" class="btn btn-primary auth-submit">Open workspace</button>
+            </form>
+
+            <div class="auth-meta">
+                <div class="soft-badge">Mail ID + name</div>
+                <div class="soft-badge">Attendance flow available after login</div>
+                {% if default_admin_hint %}
+                <div class="soft-badge">Default admin: {{ default_admin_hint.mail_id }} / {{ default_admin_hint.name }}</div>
+                {% endif %}
+            </div>
+        </div>
+    </article>
+</section>
+{% endblock %}

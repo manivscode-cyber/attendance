@@ -1,0 +1,70 @@
+{% extends 'base.html' %}
+{% from 'includes/stats-card.html' import stat_card %}
+
+{% block title %}GoDigital Attendance | Employee Directory{% endblock %}
+
+{% block content %}
+{% set manager_count = employees|selectattr('is_admin')|list|length %}
+{% set hero_kicker = 'Employee Directory' %}
+{% set hero_title = 'Employee records and profile access' %}
+{% set hero_subtitle = 'Open employee profiles, review departments, and navigate through the current roster from a single clean table.' %}
+{% set hero_actions = [
+    {'href': url_for('admin.admin_dashboard'), 'label': 'Manager Dashboard', 'class': 'btn-primary'},
+    {'href': url_for('attendance.face_attendance'), 'label': 'Open Attendance', 'class': ''}
+] %}
+{% set hero_pills = ['Employees: ' ~ employees|length, 'Managers: ' ~ manager_count, 'Profiles ready'] %}
+{% include 'partials/hero-section.html' %}
+
+<section class="stats-grid section-shell">
+    {{ stat_card('Employees', employees|length, 'accent', 'Current employee count') }}
+    {{ stat_card('Managers', manager_count, 'warning', 'Employees with manager access') }}
+    {{ stat_card('Departments', employees|map(attribute='department')|reject('equalto', None)|list|length, 'success', 'Department values present in records') }}
+</section>
+
+<section class="glass section-shell">
+    <div class="section-head">
+        <div>
+            <h2>Employee list</h2>
+            <p>Manager view of all employee records currently stored in the system.</p>
+        </div>
+        <span class="soft-badge">{{ employees|length }} employees</span>
+    </div>
+
+    {% if employees %}
+    <div class="table-wrap">
+        <table class="modern-table">
+            <thead>
+                <tr>
+                    <th>Employee ID</th>
+                    <th>Name</th>
+                    <th>Department</th>
+                    <th>Role</th>
+                    <th>Joined</th>
+                    <th>Profile</th>
+                </tr>
+            </thead>
+            <tbody>
+                {% for emp in employees %}
+                <tr>
+                    <td class="table-strong">{{ emp.emp_id }}</td>
+                    <td>{{ emp.name }}</td>
+                    <td>{{ emp.department or 'General' }}</td>
+                    <td>
+                        {% if emp.is_admin %}
+                        <span class="soft-badge">Manager</span>
+                        {% else %}
+                        <span class="soft-badge soft-badge--neutral">Employee</span>
+                        {% endif %}
+                    </td>
+                    <td>{{ emp.created_at.strftime('%Y-%m-%d') if emp.created_at else '-' }}</td>
+                    <td><a href="{{ url_for('attendance.profile', emp_id=emp.emp_id) }}" class="btn btn-primary">Open profile</a></td>
+                </tr>
+                {% endfor %}
+            </tbody>
+        </table>
+    </div>
+    {% else %}
+    <div class="empty-state">No employees found.</div>
+    {% endif %}
+</section>
+{% endblock %}

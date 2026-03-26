@@ -1,0 +1,55 @@
+<section class="hero-panel glass{% if hero_section_class %} {{ hero_section_class }}{% endif %}">
+    <div class="hero-panel__halo hero-panel__halo--coral" aria-hidden="true"></div>
+    <div class="hero-panel__halo hero-panel__halo--teal" aria-hidden="true"></div>
+    <div class="hero-grid">
+        <div class="hero-copy">
+            {% if hero_kicker %}
+            <span class="kicker">{{ hero_kicker }}</span>
+            {% endif %}
+
+            <h1 class="page-title">{{ hero_title }}</h1>
+
+            {% if hero_subtitle %}
+            <p class="page-subtitle">{{ hero_subtitle }}</p>
+            {% endif %}
+
+            {% if hero_meta %}
+            <p class="hero-meta">{{ hero_meta }}</p>
+            {% endif %}
+
+            {% if hero_actions %}
+            <div class="hero-actions">
+                {% for action in hero_actions %}
+                <a href="{{ action.href }}" class="btn{% if action.class %} {{ action.class }}{% endif %}">{{ action.label }}</a>
+                {% endfor %}
+            </div>
+            {% endif %}
+
+            {% if hero_pills %}
+            <div class="hero-pills">
+                {% for pill in hero_pills %}
+                <span class="soft-badge">{{ pill }}</span>
+                {% endfor %}
+            </div>
+            {% endif %}
+        </div>
+
+        {% if hero_summary_title or hero_summary_lines %}
+        <aside class="hero-side glass-card">
+            {% if hero_summary_kicker %}
+            <span class="kicker">{{ hero_summary_kicker }}</span>
+            {% endif %}
+            {% if hero_summary_title %}
+            <h2 class="hero-side__title">{{ hero_summary_title }}</h2>
+            {% endif %}
+            {% if hero_summary_lines %}
+            <ul class="hero-side__list">
+                {% for item in hero_summary_lines %}
+                <li>{{ item }}</li>
+                {% endfor %}
+            </ul>
+            {% endif %}
+        </aside>
+        {% endif %}
+    </div>
+</section>

@@ -1,0 +1,34 @@
+{% if quick_actions %}
+<section class="section-shell">
+    {% if quick_actions_title or quick_actions_subtitle %}
+    <div class="section-head">
+        <div>
+            {% if quick_actions_title %}
+            <h2>{{ quick_actions_title }}</h2>
+            {% endif %}
+            {% if quick_actions_subtitle %}
+            <p>{{ quick_actions_subtitle }}</p>
+            {% endif %}
+        </div>
+    </div>
+    {% endif %}
+
+    <div class="action-grid">
+        {% for action in quick_actions %}
+        <a href="{{ action.href }}" class="action-tile glass panel-link">
+            {% if action.badge %}
+            <span class="soft-badge">{{ action.badge }}</span>
+            {% endif %}
+            <h3>{{ action.title }}</h3>
+            <p>{{ action.description }}</p>
+            <div class="action-tile__footer">
+                {% if action.metric %}
+                <strong class="action-tile__metric">{{ action.metric }}</strong>
+                {% endif %}
+                <span class="btn{% if action.button_class %} {{ action.button_class }}{% endif %}">{{ action.button_label|default('Open') }}</span>
+            </div>
+        </a>
+        {% endfor %}
+    </div>
+</section>
+{% endif %}

@@ -1,0 +1,296 @@
+{% extends 'base.html' %}
+
+{% block title %}GoDigital | Manager{% endblock %}
+
+{% block content %}
+<section class="site-shell hero-panel hero-panel--single manager-hero">
+    <div class="hero-copy">
+        <p class="eyebrow">Manager Panel</p>
+        <h1>Control employees, attendance records, and exports</h1>
+        <p class="hero-text">Everything managers need for employee edits, manual attendance updates, monthly summaries, and CSV exports.</p>
+    </div>
+    <form method="post" action="{{ url_for('manager_logout') }}" class="manager-lock-form">
+        <input type="hidden" name="_csrf_token" value="{{ csrf_token() }}">
+        <button class="button button--ghost" type="submit">Lock Manager</button>
+    </form>
+</section>
+
+<section class="site-shell stats-grid stats-grid--manager">
+    <article class="glass-card stat-card">
+        <span>Employees</span>
+        <strong>{{ employees|length }}</strong>
+        <small>Total enrolled employees</small>
+    </article>
+    <article class="glass-card stat-card stat-card--blue">
+        <span>Present Today</span>
+        <strong>{{ today_bundle.present_today }}</strong>
+        <small>Employees checked in today</small>
+    </article>
+    <article class="glass-card stat-card stat-card--red">
+        <span>Late</span>
+        <strong>{{ today_bundle.late }}</strong>
+        <small>Late arrivals today</small>
+    </article>
+    <article class="glass-card stat-card stat-card--gold">
+        <span>Half-Day</span>
+        <strong>{{ today_bundle.half_day }}</strong>
+        <small>Employees below 4 working hours today</small>
+    </article>
+</section>
+
+<section class="site-shell manager-stack">
+    <article class="section-card">
+        <div class="section-head">
+            <div>
+                <p class="eyebrow">Employees</p>
+                <h2>Edit or delete employee records</h2>
+            </div>
+        </div>
+        <div class="manager-list">
+            {% for employee in employees %}
+            <form class="inline-card inline-card--employee" method="post" action="{{ url_for('update_employee', employee_pk=employee.id) }}">
+                <input type="hidden" name="_csrf_token" value="{{ csrf_token() }}">
+                <div class="employee-editor__identity table-person">
+                    {% if employee.photo_url %}
+                    <img class="avatar avatar--tiny avatar-image" src="{{ employee.photo_url }}" alt="{{ employee.name }}">
+                    {% else %}
+                    <span class="avatar avatar--tiny">{{ employee.initials }}</span>
+                    {% endif %}
+                    <div>
+                        <strong>{{ employee.employee_id }}</strong>
+                        <small>{{ employee.created_at_label }}</small>
+                    </div>
+                </div>
+                <div class="employee-editor__form">
+                    <label class="inline-field inline-field--filled">
+                        <span>Name</span>
+                        <input type="text" name="name" value="{{ employee.name }}" placeholder="Name" required>
+                    </label>
+                    <label class="inline-field inline-field--filled">
+                        <span>Phone</span>
+                        <input type="tel" name="phone" value="{{ employee.phone_value }}" placeholder="Phone" inputmode="numeric" pattern="[0-9]{10}" maxlength="10">
+                    </label>
+                    <label class="inline-field inline-field--filled">
+                        <span>Department</span>
+                        <select name="department">
+                            {% for department in department_options %}
+                            <option value="{{ department }}" {% if employee.department_value == department %}selected{% endif %}>{{ department }}</option>
+                            {% endfor %}
+                            {% if employee.department_value and employee.department_value not in department_options %}
+                            <option value="{{ employee.department_value }}" selected>{{ employee.department_value }}</option>
+                            {% endif %}
+                        </select>
+                    </label>
+                    <label class="inline-field inline-field--filled">
+                        <span>Work Mode</span>
+                        <select name="work_mode">
+                            {% for work_mode in work_mode_options %}
+                            <option value="{{ work_mode }}" {% if employee.work_mode_value == work_mode %}selected{% endif %}>{{ work_mode }}</option>
+                            {% endfor %}
+                            {% if employee.work_mode_value and employee.work_mode_value not in work_mode_options %}
+                            <option value="{{ employee.work_mode_value }}" selected>{{ employee.work_mode_value }}</option>
+                            {% endif %}
+                        </select>
+                    </label>
+                </div>
+                <div class="inline-actions inline-actions--manager">
+                    <button class="button" type="submit">Save</button>
+                    <button class="button button--danger" type="submit" formaction="{{ url_for('delete_employee', employee_pk=employee.id) }}" data-confirm="Delete {{ employee.name }}?">Delete</button>
+                </div>
+            </form>
+            {% else %}
+            <p class="empty-block">No employees have been enrolled yet.</p>
+            {% endfor %}
+        </div>
+    </article>
+
+    <article class="section-card section-card--manual">
+        <div class="section-head">
+            <div>
+                <p class="eyebrow">Manual Entry</p>
+                <h2>Add or correct attendance</h2>
+            </div>
+        </div>
+        <form class="form-grid manager-manual-form" method="post" action="{{ url_for('add_attendance_record') }}">
+            <input type="hidden" name="_csrf_token" value="{{ csrf_token() }}">
+            <label class="manager-field manager-field--wide">
+                <span>Employee</span>
+                <select name="employee_id" required>
+                    <option value="">Select employee</option>
+                    {% for employee in employees %}
+                    <option value="{{ employee.employee_id }}">{{ employee.name }} ({{ employee.employee_id }})</option>
+                    {% endfor %}
+                </select>
+            </label>
+            <label class="manager-field manager-field--wide">
+                <span>Date</span>
+                <input type="date" name="date" value="{{ filters.end_date }}" required>
+            </label>
+            <label class="manager-field">
+                <span>Check In</span>
+                <input type="time" name="check_in" required>
+            </label>
+            <label class="manager-field">
+                <span>Check Out</span>
+                <input type="time" name="check_out">
+            </label>
+            <label class="manager-field">
+                <span>Work Mode</span>
+                <select name="work_mode">
+                    <option value="">Use employee default</option>
+                    {% for work_mode in work_mode_options %}
+                    <option value="{{ work_mode }}">{{ work_mode }}</option>
+                    {% endfor %}
+                </select>
+            </label>
+            <label class="manager-field">
+                <span>Status</span>
+                <select name="status">
+                    <option value="">Auto</option>
+                    <option value="On Time">On Time</option>
+                    <option value="Late">Late</option>
+                </select>
+            </label>
+            <label class="manager-field">
+                <span>Attendance Type</span>
+                <select name="attendance_type">
+                    <option value="">Auto</option>
+                    <option value="In Progress">In Progress</option>
+                    <option value="Half Day">Half Day (&lt; 4 hrs)</option>
+                    <option value="Full Day">Full Day</option>
+                </select>
+            </label>
+            <div class="form-grid-full">
+                <button class="button" type="submit">Save Attendance</button>
+            </div>
+        </form>
+    </article>
+</section>
+
+<section class="site-shell section-card">
+    <div class="section-head">
+        <div>
+            <p class="eyebrow">Attendance History</p>
+            <h2>Filter, edit, and export records</h2>
+        </div>
+    </div>
+
+    <form class="filter-grid manager-filter-form" method="get">
+        <label class="manager-field">
+            <span>Start Date</span>
+            <input type="date" name="start_date" value="{{ filters.start_date }}">
+        </label>
+        <label class="manager-field">
+            <span>End Date</span>
+            <input type="date" name="end_date" value="{{ filters.end_date }}">
+        </label>
+        <label class="manager-field manager-field--employee-filter">
+            <span>Employee</span>
+            <select name="employee_id">
+                <option value="">All Employees</option>
+                {% for employee in employees %}
+                <option value="{{ employee.employee_id }}" {% if employee.employee_id == filters.employee_id %}selected{% endif %}>
+                    {{ employee.name }} ({{ employee.employee_id }})
+                </option>
+                {% endfor %}
+            </select>
+        </label>
+        <label class="manager-field">
+            <span>Month</span>
+            <input type="month" name="month" value="{{ month_ref }}">
+        </label>
+            <div class="filter-actions">
+                <button class="button" type="submit">Refresh</button>
+                <a class="button button--ghost" href="{{ url_for('api_export_csv', start_date=filters.start_date, end_date=filters.end_date, employee_id=filters.employee_id) }}">Export Excel</a>
+            </div>
+    </form>
+
+    <div class="manager-list manager-list--records">
+        {% for record in records %}
+        <form class="inline-card inline-card--record" method="post" action="{{ url_for('update_attendance_record', record_id=record.id) }}">
+            <input type="hidden" name="_csrf_token" value="{{ csrf_token() }}">
+            <div class="table-person">
+                <span class="avatar avatar--tiny">{{ record.initials }}</span>
+                <div>
+                    <strong>{{ record.name }}</strong>
+                    <small>{{ record.employee_id }}</small>
+                </div>
+            </div>
+            <input type="date" name="date" value="{{ record.date }}" required>
+            <input type="time" name="check_in" value="{{ record.check_in_input }}" required>
+            <input type="time" name="check_out" value="{{ record.check_out_input }}">
+            <select name="work_mode">
+                {% for work_mode in work_mode_options %}
+                <option value="{{ work_mode }}" {% if record.work_mode == work_mode %}selected{% endif %}>{{ work_mode }}</option>
+                {% endfor %}
+                {% if record.work_mode and record.work_mode not in work_mode_options %}
+                <option value="{{ record.work_mode }}" selected>{{ record.work_mode }}</option>
+                {% endif %}
+            </select>
+            <select name="status">
+                <option value="On Time" {% if record.status == 'On Time' %}selected{% endif %}>On Time</option>
+                <option value="Late" {% if record.status == 'Late' %}selected{% endif %}>Late</option>
+                <option value="Pending" {% if record.status == 'Pending' %}selected{% endif %}>Pending</option>
+            </select>
+            <select name="attendance_type">
+                <option value="In Progress" {% if record.attendance_type == 'In Progress' %}selected{% endif %}>In Progress</option>
+                <option value="Half Day" {% if record.attendance_type == 'Half Day' %}selected{% endif %}>Half Day (&lt; 4 hrs)</option>
+                <option value="Full Day" {% if record.attendance_type == 'Full Day' %}selected{% endif %}>Full Day</option>
+                <option value="Pending" {% if record.attendance_type == 'Pending' %}selected{% endif %}>Pending</option>
+            </select>
+            <div class="inline-actions">
+                <button class="button" type="submit">Update</button>
+                <button class="button button--danger" type="submit" formaction="{{ url_for('delete_attendance_record', record_id=record.id) }}" data-confirm="Delete this attendance record?">Delete</button>
+            </div>
+        </form>
+        {% else %}
+        <p class="empty-block">No attendance records match the current filter set.</p>
+        {% endfor %}
+    </div>
+</section>
+
+<section class="site-shell section-card">
+    <div class="section-head">
+        <div>
+            <p class="eyebrow">Monthly Summary</p>
+            <h2>Per-employee month snapshot</h2>
+        </div>
+        <span class="badge badge--info">{{ month_ref }}</span>
+    </div>
+    <div class="table-shell">
+        <table class="data-table">
+            <thead>
+                <tr>
+                    <th>Employee</th>
+                    <th>Present Days</th>
+                    <th>On Time</th>
+                    <th>Late</th>
+                    <th>Half Day</th>
+                    <th>Full Day</th>
+                    <th>Total Hours</th>
+                </tr>
+            </thead>
+            <tbody>
+                {% for row in monthly_summary %}
+                <tr>
+                    <td>
+                        <strong>{{ row.name }}</strong>
+                        <small class="inline-meta">{{ row.department }}</small>
+                    </td>
+                    <td>{{ row.present_days }}</td>
+                    <td>{{ row.on_time_days }}</td>
+                    <td>{{ row.late_days }}</td>
+                    <td>{{ row.half_days }}</td>
+                    <td>{{ row.full_days }}</td>
+                    <td>{{ row.hours_label }}</td>
+                </tr>
+                {% else %}
+                <tr>
+                    <td colspan="7" class="empty-row">No monthly summary data is available.</td>
+                </tr>
+                {% endfor %}
+            </tbody>
+        </table>
+    </div>
+</section>
+{% endblock %}

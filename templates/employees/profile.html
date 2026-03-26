@@ -1,0 +1,166 @@
+{% extends 'base.html' %}
+{% from 'includes/stats-card.html' import stat_card %}
+
+{% block title %}GoDigital Attendance | {{ emp.name }}{% endblock %}
+
+{% block content %}
+{% set hero_kicker = 'Employee Profile' %}
+{% set hero_title = emp.name %}
+{% set hero_subtitle = 'Review profile details, update department or email, and inspect the latest attendance history.' %}
+{% set hero_meta = 'System time: ' ~ ist_now %}
+{% set hero_actions = [
+    {'href': url_for('attendance.face_attendance'), 'label': 'Open Attendance', 'class': 'btn-primary'}
+] %}
+{% if session.get('is_admin') %}
+    {% set hero_actions = hero_actions + [{'href': url_for('admin.admin_dashboard'), 'label': 'Manager Dashboard', 'class': ''}] %}
+{% endif %}
+{% set hero_pills = ['Employee ID: ' ~ emp.emp_id, 'Department: ' ~ ((today_record.department if today_record else emp.department) or 'General')] %}
+{% set hero_summary_kicker = 'Today record' %}
+{% set hero_summary_title = today_record.display_status if today_record else 'Not marked' %}
+{% set hero_summary_lines = [
+    'Check-in: ' ~ ((today_record.check_in) if today_record and today_record.check_in else '-'),
+    'Check-out: ' ~ ((today_record.check_out) if today_record and today_record.check_out else '-'),
+    'Hours: ' ~ (((today_record.effective_total_hours|round(2)) ~ ' h') if today_record and today_record.check_in else '0.00 h')
+] %}
+{% include 'partials/hero-section.html' %}
+
+{% if today_record and today_record.check_in and not today_record.check_out %}
+<section class="alert-card alert-card--warning section-shell">
+    <div>
+        <strong>Open attendance session</strong>
+        <p>{{ emp.name }} has checked in but not checked out yet.</p>
+    </div>
+    <form method="POST" action="{{ url_for('attendance.checkout', emp_id=emp.emp_id) }}">
+        <button type="submit" class="btn btn-warning">Check-out now</button>
+    </form>
+</section>
+{% endif %}
+
+<section class="stats-grid section-shell">
+    {{ stat_card('Employee ID', emp.emp_id, 'accent', 'Employee record key') }}
+    {{ stat_card('Department', (today_record.department if today_record else emp.department) or 'General', 'accent', 'Current department') }}
+    {{ stat_card('Today', (today_record.display_status if today_record else 'Not marked'), 'success', 'Current attendance status') }}
+    {{ stat_card('Hours', ((today_record.effective_total_hours|round(2)) if today_record and today_record.check_in else '0.00'), 'warning', 'Tracked work duration', ' h') }}
+</section>
+
+<section class="page-grid section-shell">
+    <article class="glass">
+        <div class="section-head">
+            <div>
+                <h2>Edit profile</h2>
+                <p>Update the employee department and email information.</p>
+            </div>
+        </div>
+
+        <form method="POST" action="{{ url_for('attendance.edit_profile', emp_id=emp.emp_id) }}" class="stack-lg">
+            <input type="hidden" name="emp_id" value="{{ emp.emp_id }}">
+
+            <label class="form-field">
+                <span>Department</span>
+                <select id="department" name="department">
+                    <option value="General" {% if (emp.department or 'General') == 'General' %}selected{% endif %}>General</option>
+                    <option value="IT" {% if emp.department == 'IT' %}selected{% endif %}>IT</option>
+                    <option value="HR" {% if emp.department == 'HR' %}selected{% endif %}>HR</option>
+                    <option value="Finance" {% if emp.department == 'Finance' %}selected{% endif %}>Finance</option>
+                    <option value="Sales" {% if emp.department == 'Sales' %}selected{% endif %}>Sales</option>
+                    <option value="Marketing" {% if emp.department == 'Marketing' %}selected{% endif %}>Marketing</option>
+                    <option value="Operations" {% if emp.department == 'Operations' %}selected{% endif %}>Operations</option>
+                    <option value="Editor" {% if emp.department == 'Editor' %}selected{% endif %}>Editor</option>
+                </select>
+            </label>
+
+            <label class="form-field">
+                <span>Email</span>
+                <input type="email" name="email" value="{{ emp.email or '' }}" placeholder="employee@example.com">
+            </label>
+
+            <label class="form-field">
+                <span>Phone</span>
+                <input type="text" name="phone" value="{{ emp.phone or '' }}" placeholder="9876543210">
+            </label>
+
+            <button type="submit" class="btn btn-primary">Save changes</button>
+        </form>
+    </article>
+
+    <article class="glass-card">
+        <div class="section-head">
+            <div>
+                <h2>Profile summary</h2>
+                <p>Key employee information for quick review.</p>
+            </div>
+        </div>
+        <dl class="detail-grid">
+            <div>
+                <dt>Name</dt>
+                <dd>{{ emp.name }}</dd>
+            </div>
+            <div>
+                <dt>Employee ID</dt>
+                <dd>{{ emp.emp_id }}</dd>
+            </div>
+            <div>
+                <dt>Email</dt>
+                <dd>{{ emp.email or 'Not set' }}</dd>
+            </div>
+            <div>
+                <dt>Phone</dt>
+                <dd>{{ emp.phone or 'Not set' }}</dd>
+            </div>
+            <div>
+                <dt>Joined</dt>
+                <dd>{{ emp.created_at.strftime('%Y-%m-%d') if emp.created_at else '-' }}</dd>
+            </div>
+        </dl>
+    </article>
+</section>
+
+<section class="glass section-shell">
+    <div class="section-head">
+        <div>
+            <h2>Recent attendance history</h2>
+            <p>Latest employee attendance records with type, time, and status information.</p>
+        </div>
+    </div>
+
+    {% if records %}
+    <div class="record-grid">
+        {% for record in records %}
+        {% set record_status = record.status or 'Pending' %}
+        <article class="record-card glass-card">
+            <div class="record-card__head">
+                <div>
+                    <h3>{{ record.date.strftime('%Y-%m-%d') if record.date else '-' }}</h3>
+                    <p>{{ record.department or 'General' }}</p>
+                </div>
+                <span class="status-badge {{ record.badge_class }}">
+                    {{ record_status }}
+                </span>
+            </div>
+
+            <dl class="detail-grid detail-grid--compact">
+                <div>
+                    <dt>Check-in</dt>
+                    <dd>{{ record.check_in or '-' }}</dd>
+                </div>
+                <div>
+                    <dt>Check-out</dt>
+                    <dd>{{ record.check_out or '-' }}</dd>
+                </div>
+                <div>
+                    <dt>Attendance type</dt>
+                    <dd>{{ record.attendance_type or 'Onsite' }}</dd>
+                </div>
+                <div>
+                    <dt>Total hours</dt>
+                    <dd>{{ (record.effective_total_hours|round(2) ~ ' h') if record.check_in else '0.00 h' }}</dd>
+                </div>
+            </dl>
+        </article>
+        {% endfor %}
+    </div>
+    {% else %}
+    <div class="empty-state">No attendance records yet.</div>
+    {% endif %}
+</section>
+{% endblock %}
