@@ -24,6 +24,7 @@ from urllib.request import Request, urlopen
 import numpy as np
 import pytz
 from PIL import Image
+from flask_wtf.csrf import CSRFError, CSRFProtect, generate_csrf
 from flask import (
     Flask,
     flash,
@@ -36,6 +37,7 @@ from flask import (
     session,
     url_for,
 )
+from werkzeug.middleware.proxy_fix import ProxyFix
 from werkzeug.security import check_password_hash, generate_password_hash
 
 BASE_DIR = Path(__file__).resolve().parent
@@ -171,15 +173,20 @@ else:
     FACE_IMPORT_ERROR = None
 
 app = Flask(__name__, template_folder="templates", static_folder="static")
+app.wsgi_app = ProxyFix(app.wsgi_app, x_proto=1, x_host=1)
 app.config.update(
     SECRET_KEY=os.getenv("GODIGITAL_SECRET_KEY") or secrets.token_urlsafe(32),
     SESSION_COOKIE_HTTPONLY=True,
     SESSION_COOKIE_SAMESITE="Lax",
-    SESSION_COOKIE_SECURE=os.getenv("GODIGITAL_SECURE_COOKIES", "0") == "1",
+    SESSION_COOKIE_SECURE=True,
     SESSION_COOKIE_NAME="godigital_attendance_session",
     PERMANENT_SESSION_LIFETIME=timedelta(hours=10),
     MAX_CONTENT_LENGTH=8 * 1024 * 1024,
+    WTF_CSRF_FIELD_NAME="_csrf_token",
+    WTF_CSRF_HEADERS=["X-CSRFToken", "X-CSRF-Token"],
+    WTF_CSRF_TIME_LIMIT=None,
 )
+csrf = CSRFProtect(app)
 
 
 def now_ist() -> datetime:
@@ -809,28 +816,7 @@ def static_asset_url(filename: str) -> str:
 
 
 def csrf_token() -> str:
-    token = session.get("_csrf_token")
-    if not token:
-        token = secrets.token_urlsafe(32)
-        session["_csrf_token"] = token
-    return token
-
-
-def request_csrf_token() -> str | None:
-    header_token = request.headers.get("X-CSRF-Token")
-    if header_token:
-        return header_token
-
-    form_token = request.form.get("_csrf_token")
-    if form_token:
-        return form_token
-
-    if request.is_json:
-        payload = request.get_json(silent=True) or {}
-        token = payload.get("_csrf_token")
-        if isinstance(token, str):
-            return token
-    return None
+    return generate_csrf()
 
 
 def client_rate_limit_key(scope: str) -> str:
@@ -1395,23 +1381,11 @@ def require_manager_access(view_func: Any) -> Any:
     return wrapped
 
 
-@app.before_request
-def enforce_csrf() -> Any:
-    if request.method in {"GET", "HEAD", "OPTIONS"}:
-        return None
-    if request.endpoint == "static":
-        return None
-
-    expected_token = session.get("_csrf_token")
-    provided_token = request_csrf_token()
-    if (
-        expected_token
-        and provided_token
-        and hmac.compare_digest(expected_token, provided_token)
-    ):
-        return None
-
-    message = "Security validation failed. Refresh the page and try again."
+@app.errorhandler(CSRFError)
+def handle_csrf_error(error: CSRFError) -> Any:
+    message = error.description or (
+        "Security validation failed. Refresh the page and try again."
+    )
     if request.path.startswith("/api/"):
         return jsonify({"success": False, "message": message}), 403
     flash(message, "error")
@@ -2742,6 +2716,7 @@ def delete_attendance_record(record_id: int) -> Any:
 
 
 @app.post("/api/scan")
+@csrf.exempt
 def api_scan() -> Any:
     retry_after = consume_rate_limit(
         "scan",
